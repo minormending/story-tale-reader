@@ -1,0 +1,113 @@
+name: Android APK
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version name for the build (e.g. 0.2.0)'
+        required: false
+        default: '0.0.0-dev'
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: android-actions/setup-android@v3
+
+      - run: npm ci
+
+      # The Capacitor bundle is served from the WebView root, so no APP_BASE here.
+      - name: Build web assets
+        run: npm run build
+
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      - name: Decode signing keystore
+        id: keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No ANDROID_KEYSTORE_B64 secret; building a debug-signed APK instead."
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Work out the version
+        id: version
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          if [ -n "${GITHUB_REF##*/v}" ] && [ "${GITHUB_REF}" != "${GITHUB_REF#refs/tags/v}" ]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          fi
+          echo "name=${VERSION:-0.0.0-dev}" >> "$GITHUB_OUTPUT"
+          echo "code=${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+
+      - name: Build signed release APK
+        if: steps.keystore.outputs.signed == 'true'
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/release.keystore
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          APP_VERSION: ${{ steps.version.outputs.name }}
+          APP_VERSION_CODE: ${{ steps.version.outputs.code }}
+        run: ./gradlew --no-daemon assembleRelease
+
+      - name: Build debug APK
+        if: steps.keystore.outputs.signed != 'true'
+        working-directory: android
+        env:
+          APP_VERSION: ${{ steps.version.outputs.name }}
+          APP_VERSION_CODE: ${{ steps.version.outputs.code }}
+        run: ./gradlew --no-daemon assembleDebug
+
+      - name: Name the artefact
+        id: apk
+        run: |
+          if [ "${{ steps.keystore.outputs.signed }}" = "true" ]; then
+            SRC=android/app/build/outputs/apk/release/app-release.apk
+          else
+            SRC=android/app/build/outputs/apk/debug/app-debug.apk
+          fi
+          OUT="story-tale-reader-${{ steps.version.outputs.name }}.apk"
+          cp "$SRC" "$OUT"
+          echo "path=$OUT" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: story-tale-reader-apk
+          path: ${{ steps.apk.outputs.path }}
+
+      - name: Attach to the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.apk.outputs.path }}
+          body: |
+            Sideload this APK on an Android tablet or phone (Android 7.0 / API 24 or newer).
+
+            You will need to allow installation from unknown sources. The app needs no
+            permissions beyond network access for its own assets, makes no network
+            requests at runtime, and collects nothing.

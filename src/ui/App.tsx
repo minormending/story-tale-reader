@@ -3,6 +3,7 @@ import { Library } from './Library'
 import { Viewer } from './Viewer'
 import { DrmError } from '../engine/epub/ocf'
 import { mountBook, startVfs, unmountBook, type VfsStatus } from '../vfs/client'
+import { onBookOpened, takeIncomingBook } from '../native/bookIntent'
 import {
   deleteBook, getOverrides, getProgress, importBook, listLibrary, openStoredBook,
   saveOverrides, saveProgress, type LibraryEntry, type OpenedBook,
@@ -80,6 +81,23 @@ export function App() {
     },
     [enter],
   )
+
+  // Android: a book handed to us by a file manager or the share sheet, both at
+  // cold start and while the app is already running.
+  useEffect(() => {
+    let handle: { remove: () => Promise<void> } | undefined
+    const collect = async (): Promise<void> => {
+      const file = await takeIncomingBook()
+      if (file) await openFile(file)
+    }
+    void collect()
+    void onBookOpened(() => void collect()).then((registered) => {
+      handle = registered
+    })
+    return () => {
+      void handle?.remove()
+    }
+  }, [openFile])
 
   const close = useCallback(() => {
     setSession((previous) => {
