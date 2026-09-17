@@ -85,21 +85,21 @@ export function Library({
 }
 
 /**
- * Development-only shortcut for opening books from `corpus/` without a file picker.
- * Stripped from production builds by the `import.meta.env.DEV` guard.
+ * Shortcut for opening books from `corpus/` without a file picker, used by the dev
+ * server and `vite preview`. The endpoint only exists behind the Vite plugin, so a
+ * deployed static build never renders this.
  */
 function DevCorpus({ onOpenFile }: { onOpenFile: (file: File) => void }) {
   const [books, setBooks] = useState<CorpusBook[]>([])
 
   useEffect(() => {
-    if (!import.meta.env.DEV) return
     void fetch('/corpus/index.json')
       .then((response) => (response.ok ? response.json() : []))
       .then(setBooks)
       .catch(() => setBooks([]))
   }, [])
 
-  if (!import.meta.env.DEV || books.length === 0) return null
+  if (books.length === 0) return null
 
   return (
     <div className="dev-corpus">

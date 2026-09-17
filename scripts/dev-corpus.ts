@@ -1,5 +1,6 @@
 import { createReadStream, existsSync, readdirSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
+import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Plugin } from 'vite'
 
 const ROOT = resolve('corpus')
@@ -12,29 +13,34 @@ const EXTENSIONS = /\.(epub|pdf|mobi|azw3|prc)$/i
  * is gitignored, so no in-copyright book is ever served publicly.
  */
 export function devCorpus(): Plugin {
+  const middleware = (req: IncomingMessage, res: ServerResponse, next: () => void): void => {
+    const url = (req.url ?? '/').split('?')[0] ?? '/'
+
+    if (url === '/' || url === '/index.json') {
+      res.setHeader('Content-Type', 'application/json')
+      res.end(JSON.stringify(listBooks()))
+      return
+    }
+
+    const file = resolve(join(ROOT, decodeURIComponent(url)))
+    if (!file.startsWith(ROOT) || !existsSync(file) || !statSync(file).isFile()) {
+      next()
+      return
+    }
+    res.setHeader('Content-Type', 'application/octet-stream')
+    res.setHeader('Content-Length', String(statSync(file).size))
+    createReadStream(file).pipe(res)
+  }
+
   return {
     name: 'story-tale-dev-corpus',
-    apply: 'serve',
     configureServer(server) {
-      server.middlewares.use('/corpus', (req, res, next) => {
-        const url = (req.url ?? '/').split('?')[0] ?? '/'
-
-        if (url === '/' || url === '/index.json') {
-          const books = listBooks()
-          res.setHeader('Content-Type', 'application/json')
-          res.end(JSON.stringify(books))
-          return
-        }
-
-        const file = resolve(join(ROOT, decodeURIComponent(url)))
-        if (!file.startsWith(ROOT) || !existsSync(file) || !statSync(file).isFile()) {
-          next()
-          return
-        }
-        res.setHeader('Content-Type', 'application/octet-stream')
-        res.setHeader('Content-Length', String(statSync(file).size))
-        createReadStream(file).pipe(res)
-      })
+      server.middlewares.use('/corpus', middleware)
+    },
+    // `vite preview` too, so the production bundle can be exercised against real
+    // books before it is deployed.
+    configurePreviewServer(server) {
+      server.middlewares.use('/corpus', middleware)
     },
   }
 }

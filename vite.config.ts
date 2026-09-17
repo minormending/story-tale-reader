@@ -22,6 +22,9 @@ export default defineConfig({
       injectManifest: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
         maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
+        // Bundle to a classic worker: module service workers are still not
+        // universally supported, and the registration in vfs/client.ts is classic.
+        rollupFormat: 'iife',
       },
       // The virtual filesystem is not a progressive enhancement — fixed-layout
       // rendering needs it in development too.
