@@ -15,6 +15,8 @@ export interface ReadAlong {
   toggle: () => void
   stop: () => void
   onPageReady: (doc: Document, page: BookPage) => void
+  /** True when a tap landed on a word the narration can jump to. */
+  claimsTap: (target: EventTarget | null) => boolean
 }
 
 /** Pages of a spread in reading order. */
@@ -105,5 +107,10 @@ export function useReadAlong({
     playerRef.current?.pause()
   }, [])
 
-  return { available, playing, toggle, stop, onPageReady }
+  const claimsTap = useCallback(
+    (target: EventTarget | null) => playerRef.current?.claimsTap(target) ?? false,
+    [],
+  )
+
+  return { available, playing, toggle, stop, onPageReady, claimsTap }
 }

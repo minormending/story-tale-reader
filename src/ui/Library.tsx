@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { BuildTag } from './BuildTag'
 import type { LibraryEntry } from '../store/library'
 import { storageEstimate } from '../store/files'
 
@@ -143,6 +144,10 @@ export function Library({
           (DRM-protected) books can&rsquo;t be opened.
         </p>
         <StorageLine />
+        <div className="build-row">
+          <span className="muted">Version</span>
+          <BuildTag />
+        </div>
       </footer>
     </div>
   )

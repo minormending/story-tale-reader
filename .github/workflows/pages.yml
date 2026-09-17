@@ -19,6 +19,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The build stamps a version number on the page, counted from the commit
+          # history. actions/checkout is shallow by default, which would make that
+          # number 1 on every build forever.
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22

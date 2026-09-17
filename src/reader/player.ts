@@ -128,24 +128,55 @@ export class ReadAlongPlayer {
     else await this.play()
   }
 
+  /**
+   * Whether a tap landed on a word the narration can jump to.
+   *
+   * The viewer asks before treating a tap as a page turn. Without it, tapping a
+   * word in the outer third of the screen turned the page instead of reading the
+   * word — and because the turn unmounts the page, the seek was lost too, so the
+   * feature was unreachable on exactly the books that have it.
+   */
+  claimsTap(target: EventTarget | null): boolean {
+    const element = asElement(target)?.closest('[id]')
+    if (!element?.id) return false
+    const pageIndex = this.pageIndexOf(element.ownerDocument)
+    if (pageIndex === undefined) return false
+    return this.locate(pageIndex, element.id) !== undefined
+  }
+
   /** Jump to the word a reader tapped, and keep going from there. */
   async seekToFragment(pageIndex: number, elementId: string): Promise<void> {
+    const found = this.locate(pageIndex, elementId)
+    if (!found) return
+
+    const segment = this.segments[found.segment]!
+    this.segmentIndex = found.segment
+    await this.loadSegment(segment)
+    this.audio.currentTime = segment.fragments[found.index]!.start
+    this.activeFragment = -1
+    if (!this.playing) await this.play()
+    else this.tick()
+  }
+
+  /** Where in the queue a page's element sits, if it is narrated at all. */
+  private locate(pageIndex: number, elementId: string): { segment: number; index: number } | undefined {
     for (let s = 0; s < this.segments.length; s++) {
       const segment = this.segments[s]!
       const index = segment.fragments.findIndex(
         (fragment) =>
           fragment.fragment === elementId && this.pageByPath.get(fragment.textPath) === pageIndex,
       )
-      if (index === -1) continue
-
-      this.segmentIndex = s
-      await this.loadSegment(segment)
-      this.audio.currentTime = segment.fragments[index]!.start
-      this.activeFragment = -1
-      if (!this.playing) await this.play()
-      else this.tick()
-      return
+      if (index !== -1) return { segment: s, index }
     }
+    return undefined
+  }
+
+  private pageIndexOf(doc: Document | null | undefined): number | undefined {
+    if (!doc) return undefined
+    for (const [index, candidate] of this.documents) {
+      if (candidate === doc) return index
+    }
+    return undefined
   }
 
   destroy(): void {
@@ -268,14 +299,8 @@ export class ReadAlongPlayer {
 
   private onDocumentClick = (event: Event): void => {
     const target = event.target as HTMLElement | null
-    const doc = target?.ownerDocument
-    if (!target || !doc) return
-
-    let pageIndex: number | undefined
-    for (const [index, candidate] of this.documents) {
-      if (candidate === doc) pageIndex = index
-    }
-    if (pageIndex === undefined) return
+    const pageIndex = this.pageIndexOf(target?.ownerDocument)
+    if (!target || pageIndex === undefined) return
 
     const element = target.closest('[id]')
     if (!element?.id) return
@@ -299,6 +324,19 @@ export class ReadAlongPlayer {
     }`
     ;(doc.head ?? doc.documentElement).appendChild(style)
   }
+}
+
+/**
+ * Narrow an event target to an element across realm boundaries.
+ *
+ * `instanceof Element` is false for a node from inside an iframe: every document
+ * has its own constructors, and the page documents are separate realms. That made
+ * every word tap look like empty space. `nodeType` is just a number, so it crosses
+ * realms unharmed.
+ */
+export function asElement(target: EventTarget | null): Element | null {
+  const node = target as Node | null
+  return node !== null && node.nodeType === 1 ? (node as Element) : null
 }
 
 function groupByAudio(fragments: OverlayFragment[]): Segment[] {

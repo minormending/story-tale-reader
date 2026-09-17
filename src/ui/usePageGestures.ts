@@ -26,6 +26,14 @@ export interface GestureActions {
   onTurn: (direction: -1 | 1) => void
   /** A tap in the middle band. */
   onToggleChrome: () => void
+  /**
+   * Given what was tapped, whether something else owns this tap.
+   *
+   * Read-along uses it: tapping a word should read that word, not turn the page.
+   * Only taps are offered — a swipe always turns, so a page whose text fills the
+   * screen is still pageable.
+   */
+  claimTap?: (target: EventTarget | null) => boolean
 }
 
 interface Point {
@@ -84,6 +92,9 @@ export function usePageGestures(actions: GestureActions) {
     }
 
     if (Math.abs(dx) > TAP_SLOP_PX || Math.abs(dy) > TAP_SLOP_PX) return
+
+    // Something on the page may want this tap for itself — a narrated word.
+    if (latest.current.claimTap?.(event.target)) return
 
     // A tap. Edges turn the page, the middle band shows the controls.
     const width = window.innerWidth || 1

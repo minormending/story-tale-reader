@@ -110,12 +110,6 @@ export function Viewer({
   // In a right-to-left book the "next" page is to the left.
   const forward = book.direction === 'rtl' ? -1 : 1
 
-  const gestures = usePageGestures({
-    onTurn: (direction) => turn(direction * forward),
-    onToggleChrome: () => setChromeVisible((visible) => !visible),
-  })
-
-
   const [readAlongSettings, setReadAlongSettings] = useState<ReadAlongSettings>({
     rate: 1,
     autoAdvance: true,
@@ -128,6 +122,14 @@ export function Viewer({
     direction: book.direction,
     settings: readAlongSettings,
     onFinishedSpread: () => turn(forward),
+  })
+
+  // Declared after read-along so a tap on a narrated word can be handed to it
+  // rather than turning the page.
+  const gestures = usePageGestures({
+    onTurn: (direction) => turn(direction * forward),
+    onToggleChrome: () => setChromeVisible((visible) => !visible),
+    claimTap: readAlong.claimsTap,
   })
 
   const onKey = useCallback(
