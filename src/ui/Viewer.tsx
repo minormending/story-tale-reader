@@ -3,21 +3,31 @@ import { SpreadView } from './SpreadView'
 import { useFrameSize } from './useFrameSize'
 import { applySpreadShift, buildSpreads, shouldPair } from '../engine/layout/spread'
 import { modalViewport, DEFAULT_VIEWPORT } from '../engine/layout/viewport'
-import type { BookPage, LayoutOverrides, ParsedBook } from '../engine/types'
+import type { BookPage, Direction, LayoutOverrides, ParsedBook, Spread } from '../engine/types'
 
 export interface ViewerProps {
   bookId: string
   book: ParsedBook
+  /** Spine index to resume from. */
+  initialPageIndex: number
   overrides: LayoutOverrides
   onOverridesChange: (next: LayoutOverrides) => void
+  onPageIndexChange: (pageIndex: number) => void
   onClose: () => void
 }
 
 const SWIPE_THRESHOLD_PX = 40
 
-export function Viewer({ bookId, book, overrides, onOverridesChange, onClose }: ViewerProps) {
+export function Viewer({
+  bookId,
+  book,
+  initialPageIndex,
+  overrides,
+  onOverridesChange,
+  onPageIndexChange,
+  onClose,
+}: ViewerProps) {
   const [stageRef, frame] = useFrameSize<HTMLDivElement>()
-  const [spreadIndex, setSpreadIndex] = useState(0)
   const [chromeVisible, setChromeVisible] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
 
@@ -38,28 +48,37 @@ export function Viewer({ bookId, book, overrides, onOverridesChange, onClose }: 
     [pages, book.direction, paired],
   )
 
-  // Keep the reader on roughly the same page when the spread grouping changes
-  // (rotation, a shift toggle, switching to single-page).
-  const currentPageIndex = useRef(0)
-  useEffect(() => {
-    const target = currentPageIndex.current
-    const found = spreads.findIndex(
-      (s) => s.center?.index === target || s.left?.index === target || s.right?.index === target,
-    )
-    setSpreadIndex(found === -1 ? 0 : found)
-  }, [spreads])
+  /*
+   * The reading position is a *page* index, not a spread index, and it is the only
+   * piece of state. The spread index is derived from it, so regrouping the book —
+   * rotating, toggling the shift, switching to single pages — keeps the reader on
+   * the same page for free, and nothing can race to overwrite the resumed position.
+   */
+  const [pageIndex, setPageIndex] = useState(initialPageIndex)
 
-  const spread = spreads[Math.min(spreadIndex, spreads.length - 1)]
+  const spreadIndex = useMemo(() => {
+    const found = spreads.findIndex(
+      (s) =>
+        s.center?.index === pageIndex || s.left?.index === pageIndex || s.right?.index === pageIndex,
+    )
+    return found === -1 ? 0 : found
+  }, [spreads, pageIndex])
+
+  const spread = spreads[spreadIndex]
+
+  const notifyPage = useRef(onPageIndexChange)
+  notifyPage.current = onPageIndexChange
   useEffect(() => {
-    const first = spread?.left ?? spread?.center ?? spread?.right
-    if (first) currentPageIndex.current = first.index
-  }, [spread])
+    notifyPage.current(pageIndex)
+  }, [pageIndex])
 
   const turn = useCallback(
     (delta: number) => {
-      setSpreadIndex((index) => Math.min(Math.max(index + delta, 0), spreads.length - 1))
+      const target = spreads[Math.min(Math.max(spreadIndex + delta, 0), spreads.length - 1)]
+      const first = leadPage(target, book.direction)
+      if (first) setPageIndex(first.index)
     },
-    [spreads.length],
+    [spreads, spreadIndex, book.direction],
   )
 
   // In a right-to-left book the "next" page is to the left.
@@ -100,7 +119,7 @@ export function Viewer({ bookId, book, overrides, onOverridesChange, onClose }: 
     else setChromeVisible((visible) => !visible)
   }
 
-  const label = describePosition(spread?.left ?? spread?.center, spread?.right)
+  const label = describePosition(spread, book.direction)
   const shift = overrides.spreadShift ?? 0
 
   return (
@@ -188,12 +207,21 @@ export function Viewer({ bookId, book, overrides, onOverridesChange, onClose }: 
   )
 }
 
-function describePosition(first: BookPage | undefined, second: BookPage | undefined): string {
+/** The page a spread starts on in reading order. */
+function leadPage(spread: Spread | undefined, direction: Direction): BookPage | undefined {
+  if (!spread) return undefined
+  return direction === 'rtl'
+    ? (spread.right ?? spread.center ?? spread.left)
+    : (spread.left ?? spread.center ?? spread.right)
+}
+
+function describePosition(spread: Spread | undefined, direction: Direction): string {
+  if (!spread) return ''
   const name = (page: BookPage | undefined): string | undefined =>
     page ? (page.printedPage ?? String(page.index + 1)) : undefined
-  const a = name(first)
-  const b = name(second)
-  if (a && b) return `Pages ${a}–${b}`
-  if (a) return `Page ${a}`
+  const first = name(leadPage(spread, direction))
+  const other = name(direction === 'rtl' ? spread.left : spread.right)
+  if (first && other && first !== other) return `Pages ${first}–${other}`
+  if (first) return `Page ${first}`
   return ''
 }

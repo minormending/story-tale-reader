@@ -1,19 +1,24 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Library } from './Library'
 import { Viewer } from './Viewer'
-import { loadEpub } from '../engine/epub/load'
 import { DrmError } from '../engine/epub/ocf'
-import { blobSource } from '../engine/zip/reader'
 import { mountBook, startVfs, unmountBook, type VfsStatus } from '../vfs/client'
+import {
+  deleteBook, getOverrides, getProgress, importBook, listLibrary, openStoredBook,
+  saveOverrides, saveProgress, type LibraryEntry, type OpenedBook,
+} from '../store/library'
 import type { LayoutOverrides, ParsedBook } from '../engine/types'
 
 interface Session {
   bookId: string
   book: ParsedBook
+  entry: LibraryEntry
+  initialPageIndex: number
 }
 
 export function App() {
   const [vfs, setVfs] = useState<VfsStatus | 'starting'>('starting')
+  const [entries, setEntries] = useState<LibraryEntry[]>([])
   const [session, setSession] = useState<Session | null>(null)
   const [overrides, setOverrides] = useState<LayoutOverrides>({})
   const [busy, setBusy] = useState<string | null>(null)
@@ -21,32 +26,57 @@ export function App() {
 
   useEffect(() => {
     void startVfs().then(setVfs)
+    void listLibrary().then(setEntries)
   }, [])
+
+  const enter = useCallback(async (opened: OpenedBook) => {
+    const { entry, book, archive } = opened
+    mountBook(entry.id, archive)
+    const [storedOverrides, pageIndex] = await Promise.all([
+      getOverrides(entry.id),
+      getProgress(entry.id),
+    ])
+    setOverrides(storedOverrides)
+    setSession((previous) => {
+      if (previous && previous.bookId !== entry.id) unmountBook(previous.bookId)
+      return { bookId: entry.id, book, entry, initialPageIndex: pageIndex }
+    })
+    setEntries(await listLibrary())
+  }, [])
+
+  const describe = (cause: unknown): string =>
+    cause instanceof DrmError
+      ? cause.message
+      : `Couldn’t open this book: ${cause instanceof Error ? cause.message : String(cause)}`
 
   const openFile = useCallback(
     async (file: File) => {
       setError(null)
       setBusy(`Opening ${file.name}…`)
       try {
-        const bookId = await fingerprint(file)
-        const { book, archive } = await loadEpub(blobSource(file))
-        mountBook(bookId, archive)
-        setOverrides({})
-        setSession((previous) => {
-          if (previous) unmountBook(previous.bookId)
-          return { bookId, book }
-        })
+        await enter(await importBook(file))
       } catch (cause) {
-        setError(
-          cause instanceof DrmError
-            ? cause.message
-            : `Couldn’t open this book: ${cause instanceof Error ? cause.message : String(cause)}`,
-        )
+        setError(describe(cause))
       } finally {
         setBusy(null)
       }
     },
-    [],
+    [enter],
+  )
+
+  const openEntry = useCallback(
+    async (id: string) => {
+      setError(null)
+      setBusy('Opening…')
+      try {
+        await enter(await openStoredBook(id))
+      } catch (cause) {
+        setError(describe(cause))
+      } finally {
+        setBusy(null)
+      }
+    },
+    [enter],
   )
 
   const close = useCallback(() => {
@@ -54,6 +84,20 @@ export function App() {
       if (previous) unmountBook(previous.bookId)
       return null
     })
+    void listLibrary().then(setEntries)
+  }, [])
+
+  const changeOverrides = useCallback(
+    (next: LayoutOverrides) => {
+      setOverrides(next)
+      if (session) void saveOverrides(session.bookId, next)
+    },
+    [session],
+  )
+
+  const remove = useCallback(async (id: string) => {
+    await deleteBook(id)
+    setEntries(await listLibrary())
   }, [])
 
   if (session) {
@@ -61,8 +105,10 @@ export function App() {
       <Viewer
         bookId={session.bookId}
         book={session.book}
+        initialPageIndex={session.initialPageIndex}
         overrides={overrides}
-        onOverridesChange={setOverrides}
+        onOverridesChange={changeOverrides}
+        onPageIndexChange={(pageIndex) => void saveProgress(session.bookId, pageIndex)}
         onClose={close}
       />
     )
@@ -70,7 +116,10 @@ export function App() {
 
   return (
     <Library
+      entries={entries}
       onOpenFile={(file) => void openFile(file)}
+      onOpenEntry={(id) => void openEntry(id)}
+      onDelete={(id) => void remove(id)}
       busy={busy}
       error={error}
       vfsWarning={
@@ -80,19 +129,4 @@ export function App() {
       }
     />
   )
-}
-
-/**
- * Stable per-book id from the file's head and size. Used as the virtual-filesystem
- * key, and in M2 as the library's identity for de-duplicating re-imports.
- */
-async function fingerprint(file: File): Promise<string> {
-  const head = await file.slice(0, 1024 * 1024).arrayBuffer()
-  const salted = new Uint8Array(head.byteLength + 8)
-  salted.set(new Uint8Array(head), 0)
-  new DataView(salted.buffer).setFloat64(head.byteLength, file.size, true)
-  const digest = await crypto.subtle.digest('SHA-256', salted)
-  return [...new Uint8Array(digest).slice(0, 12)]
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('')
 }
