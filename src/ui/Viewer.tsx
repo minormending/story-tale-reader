@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { SpreadView } from './SpreadView'
+import { SpreadView, fitScale, spreadContentSize } from './SpreadView'
 import { useFrameSize } from './useFrameSize'
 import { applySpreadShift, buildSpreads, shouldPair } from '../engine/layout/spread'
 import { modalViewport, DEFAULT_VIEWPORT } from '../engine/layout/viewport'
@@ -8,6 +8,8 @@ import { PdfPage } from './PdfPage'
 import { useReadAlong, type ReadAlongSettings } from './useReadAlong'
 import { usePageKeys } from './usePageKeys'
 import { usePageGestures } from './usePageGestures'
+import { useWakeLock } from './useWakeLock'
+import { LockButton } from './LockButton'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { InlinePageResolver } from '../vfs/inline'
 import { isVfsReady } from '../vfs/client'
@@ -44,6 +46,10 @@ export function Viewer({
   const [stageRef, frame] = useFrameSize<HTMLDivElement>()
   const [chromeVisible, setChromeVisible] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [locked, setLocked] = useState(false)
+
+  // A picture book is read slowly enough to outlast a screen timeout.
+  useWakeLock(true)
 
   const modal = useMemo(
     () => modalViewport(book.pages.map((page) => page.viewport)) ?? DEFAULT_VIEWPORT,
@@ -124,13 +130,31 @@ export function Viewer({
     onFinishedSpread: () => turn(forward),
   })
 
+  // The drawn size of the spread, which bounds how far a zoomed page can be panned.
+  const rendered = useMemo(() => {
+    if (!spread) return { width: 0, height: 0 }
+    const content = spreadContentSize(spread, modal)
+    const fit = fitScale(content, frame)
+    return { width: content.width * fit, height: content.height * fit }
+  }, [spread, modal, frame])
+
   // Declared after read-along so a tap on a narrated word can be handed to it
   // rather than turning the page.
   const gestures = usePageGestures({
     onTurn: (direction) => turn(direction * forward),
     onToggleChrome: () => setChromeVisible((visible) => !visible),
     claimTap: readAlong.claimsTap,
+    bounds: { frame, content: rendered },
   })
+
+  const { zoom, pan } = gestures.transform
+  const zoomed = zoom > 1.02
+
+  // A new spread starts unzoomed: carrying a 4x zoom across a page turn leaves the
+  // reader looking at a corner of a picture they have not seen yet.
+  useEffect(() => {
+    gestures.resetZoom()
+  }, [pageIndex, gestures.resetZoom])
 
   const onKey = useCallback(
     (event: KeyboardEvent): void => {
@@ -139,10 +163,11 @@ export function Viewer({
       else if (event.key === 'Escape') {
         // Back out one level at a time rather than leaving the book from the menu.
         if (menuOpen) setMenuOpen(false)
-        else onClose()
+        // Lock mode takes away every way out of the book, keyboard included.
+        else if (!locked) onClose()
       }
     },
-    [turn, forward, onClose, menuOpen],
+    [turn, forward, onClose, menuOpen, locked],
   )
 
   useEffect(() => {
@@ -176,6 +201,14 @@ export function Viewer({
     <div className="viewer">
       <main className="stage" ref={stageRef} {...gestures.stageProps}>
         {spread && (
+          <div
+            className="zoom-layer"
+            style={
+              zoomed
+                ? { transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }
+                : undefined
+            }
+          >
           <SpreadView
             spread={spread}
             modal={modal}
@@ -194,31 +227,48 @@ export function Viewer({
               )
             }
           />
+          </div>
         )}
       </main>
 
       <header className={`chrome chrome-top${chromeVisible ? '' : ' hidden'}`}>
-        <button
-          className="icon-button"
-          onClick={() => {
-            readAlong.stop()
-            onClose()
-          }}
-          aria-label="Back to library"
-        >
-          ‹ Library
-        </button>
+        {locked ? (
+          <span className="chrome-spacer" />
+        ) : (
+          <button
+            className="icon-button"
+            onClick={() => {
+              readAlong.stop()
+              onClose()
+            }}
+            aria-label="Back to library"
+          >
+            ‹ Library
+          </button>
+        )}
         <div className="chrome-title">
           <h1>{book.metadata.title}</h1>
           <span className="muted">{label}</span>
         </div>
-        <button
-          className="icon-button"
-          onClick={() => setMenuOpen((open) => !open)}
-          aria-expanded={menuOpen}
-        >
-          Fix layout
-        </button>
+        <div className="chrome-actions">
+          {!locked && (
+            <button
+              className="icon-button"
+              onClick={() => setMenuOpen((open) => !open)}
+              aria-expanded={menuOpen}
+            >
+              Fix layout
+            </button>
+          )}
+          <LockButton
+            locked={locked}
+            onLock={() => {
+              setMenuOpen(false)
+              setLocked(true)
+            }}
+            onUnlock={() => setLocked(false)}
+          />
+        </div>
       </header>
 
       {menuOpen && (
@@ -305,9 +355,15 @@ export function Viewer({
               {readAlong.playing ? '\u23f8' : '\u25b6'}
             </button>
           )}
-          <span className="muted">
-            {spreadIndex + 1} / {spreads.length}
-          </span>
+          {zoomed ? (
+            <button className="icon-button" onClick={gestures.resetZoom}>
+              {zoom.toFixed(1)}&times; &middot; reset
+            </button>
+          ) : (
+            <span className="muted">
+              {spreadIndex + 1} / {spreads.length}
+            </span>
+          )}
         </div>
         <button
           className="icon-button"

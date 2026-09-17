@@ -92,9 +92,10 @@ function injectViewerStyles(doc: Document): void {
   style.id = VIEWER_STYLE_ID
   style.textContent = `
     html, body { overflow: hidden !important; }
-    /* Let the reader swipe across the artwork: without this the browser may claim
-       the gesture as a scroll or double-tap zoom before the page turn is seen. */
-    html { touch-action: manipulation; }
+    /* The reader owns every gesture over a page — swipe to turn, pinch to zoom,
+       pan while zoomed. Left to itself the browser would claim them first and the
+       page turn or the zoom would never be seen. */
+    html { touch-action: none; }
     * { -webkit-tap-highlight-color: transparent; }
     img, image, svg { -webkit-user-drag: none; user-select: none; }
     body { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }

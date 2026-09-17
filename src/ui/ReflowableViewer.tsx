@@ -3,6 +3,8 @@ import { ReflowableStage } from './ReflowableStage'
 import { useFrameSize } from './useFrameSize'
 import { usePageKeys } from './usePageKeys'
 import { usePageGestures } from './usePageGestures'
+import { useWakeLock } from './useWakeLock'
+import { LockButton } from './LockButton'
 import { DEFAULT_TYPOGRAPHY, type ReaderFont, type ReaderTheme, type Typography } from '../reader/typography'
 import { InlinePageResolver } from '../vfs/inline'
 import { isVfsReady } from '../vfs/client'
@@ -34,6 +36,9 @@ export function ReflowableViewer({
   const [stageRef, frame] = useFrameSize<HTMLDivElement>()
   const [chromeVisible, setChromeVisible] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [locked, setLocked] = useState(false)
+
+  useWakeLock(true)
   const [typography, setTypography] = useState<Typography>(DEFAULT_TYPOGRAPHY)
 
   const inline = useMemo(
@@ -95,10 +100,10 @@ export function ReflowableViewer({
       else if (event.key === 'ArrowLeft' || event.key === 'PageUp') turn(-forward)
       else if (event.key === 'Escape') {
         if (menuOpen) setMenuOpen(false)
-        else onClose()
+        else if (!locked) onClose()
       }
     },
-    [turn, forward, onClose, menuOpen],
+    [turn, forward, onClose, menuOpen, locked],
   )
 
   useEffect(() => {
@@ -151,18 +156,38 @@ export function ReflowableViewer({
       </main>
 
       <header className={`chrome chrome-top${chromeVisible ? '' : ' hidden'}`}>
-        <button className="icon-button" onClick={onClose} aria-label="Back to library">
-          ‹ Library
-        </button>
+        {locked ? (
+          <span className="chrome-spacer" />
+        ) : (
+          <button className="icon-button" onClick={onClose} aria-label="Back to library">
+            ‹ Library
+          </button>
+        )}
         <div className="chrome-title">
           <h1>{book.metadata.title}</h1>
           <span className="muted">
             Section {sectionIndex + 1} of {sections.length}
           </span>
         </div>
-        <button className="icon-button" onClick={() => setMenuOpen((open) => !open)}>
-          Text
-        </button>
+        <div className="chrome-actions">
+          {!locked && (
+            <button
+              className="icon-button"
+              onClick={() => setMenuOpen((open) => !open)}
+              aria-expanded={menuOpen}
+            >
+              Text
+            </button>
+          )}
+          <LockButton
+            locked={locked}
+            onLock={() => {
+              setMenuOpen(false)
+              setLocked(true)
+            }}
+            onUnlock={() => setLocked(false)}
+          />
+        </div>
       </header>
 
       {menuOpen && (

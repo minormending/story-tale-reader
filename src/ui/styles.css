@@ -355,10 +355,13 @@ button { font: inherit; cursor: pointer; }
 .library-main { display: contents; }
 
 /*
- * Suppress double-tap-to-zoom on the reading stage only: it would otherwise fight
- * the tap-to-turn gesture. Pinch-zoom still works, here and everywhere else.
+ * The reading stage handles its own pinch, pan and double-tap (SPEC.md §6.2), so
+ * the browser must not claim those gestures first. Everywhere else — the chrome,
+ * the library — keeps normal browser pinch-zoom, so the interface can still be
+ * magnified (WCAG 1.4.4); over the stage the app's own zoom does the same job
+ * better, because it knows to reset on a page turn and bounds the pan.
  */
-.stage { touch-action: manipulation; }
+.stage { touch-action: none; }
 
 /* Destructive, but still a 44px target. */
 .shelf-remove { min-height: 44px; display: inline-flex; align-items: center; }
@@ -392,3 +395,44 @@ button { font: inherit; cursor: pointer; }
 }
 .build-tag:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); }
 .build-tag:disabled { cursor: default; opacity: 0.7; }
+
+/* ------------------------------- lock mode ------------------------------- */
+
+.chrome-actions { display: flex; align-items: center; gap: 0.35rem; }
+/* Holds the title centred once the Library button is gone. */
+.chrome-spacer { display: block; min-width: 3.5rem; }
+
+.lock {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 1.05rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.lock-on { border-color: var(--accent); background: rgba(255, 180, 84, 0.14); }
+.lock-face { position: relative; }
+
+/* The unlock hold, drawn as a fill. Scaled from the left by the hold's progress. */
+.lock-fill {
+  position: absolute;
+  inset: 0;
+  transform-origin: left center;
+  background: var(--accent);
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+/* --------------------------------- zoom --------------------------------- */
+
+.zoom-layer {
+  /* Scaled about its own centre, which is the centre of the spread. */
+  transform-origin: 50% 50%;
+  will-change: transform;
+}

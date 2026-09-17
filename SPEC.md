@@ -375,14 +375,31 @@ empty shelf. **Sourcing that sample is an open item — see §13.**
 - Tap left third / right third → previous / next. Tap center → toggle chrome.
 - Swipe horizontally → page turn, with a short slide transition (no page-curl).
 - Chrome auto-hides after 3 s: back, title, page indicator, read-along controls, menu.
-- Pinch to zoom a single page up to 4×, pan while zoomed, double-tap to reset. (Important for picture books — kids want to look closely at a detail.)
+- Pinch to zoom up to 4×, pan while zoomed, tap to reset. **Built**, with two
+  deviations: the whole spread zooms rather than one page, so a detail crossing the
+  gutter stays whole and panning works across both halves; and a *single* tap
+  resets rather than a double tap, because at 1× a tap in the outer third turns the
+  page — a double tap would have fired two page turns before the second tap landed.
+  ctrl/cmd + wheel is the pointer-device equivalent, since a mouse cannot pinch.
+  Zoom resets on a page turn, and the pan is bounded so the page cannot be flung
+  off-screen.
 - Rotate: portrait → single page; landscape → spread, per `rendition:spread`.
 - Resume exactly where you left off, per book.
 
 ### 6.3 Child-safety
 
-- **Lock mode**: a long-press on a padlock disables the back/menu affordances; exiting requires a 3-second press. Stops a 5-year-old from falling out of the book mid-story.
-- Screen-on while reading.
+- **Lock mode**: **built.** A tap on the padlock hides the library and menu
+  affordances and makes Escape a no-op, leaving everything that reads the book —
+  paging, narration, zoom. Leaving takes a three-second hold, shown as a fill.
+  Locking is a tap rather than the specified long-press: nothing is lost by
+  locking, and the guard belongs on the direction a child must not manage by
+  accident. Keyboard and assistive-technology activation toggles directly, because
+  a hold cannot be expressed with a key and trapping an AT user would be worse than
+  the risk it guards against. The state is per-session and is not persisted — being
+  stuck locked after a reload, with no memory of having locked it, is a worse
+  failure than losing the lock.
+- Screen-on while reading: **built**, using the Screen Wake Lock API rather than a
+  Capacitor plugin, so it works in the installed PWA as well as the APK.
 - No external links, no network calls at runtime, no ads, no analytics, no accounts.
 
 ### 6.4 Per-book overrides — the pragmatic escape hatch
@@ -552,6 +569,13 @@ Visual correctness is the entire product, so the test strategy is weighted towar
   been exercised running.
 - **Bookmarks** are still unscoped (§16.3 deferred them to M5 or later); resume
   position ships and works.
+- **Pinch-zoom and lock mode are verified with a mouse and synthetic pointer
+  events, not a touchscreen.** Touch differs in ways that matter here — it captures
+  a pointer to its original target, and the browser arbitrates multi-touch
+  differently — so the two-finger pinch path in particular is unproven on a real
+  device. The wake lock could only be observed failing with `NotAllowedError: the
+  requesting page is not visible`, which is the expected result for a hidden page
+  and the exact case the hook re-acquires from; it has not been seen holding.
 - **CFI** position tracking was specified for reflowable books (§5.5). The
   implementation stores section index plus screen index instead, which survives a
   font-size change within a section but not across one. Worth revisiting when
