@@ -20,6 +20,7 @@ export function ReflowableStage({
   typography,
   screen,
   onMeasured,
+  onDocumentReady,
 }: {
   bookId: string
   page: BookPage
@@ -28,6 +29,8 @@ export function ReflowableStage({
   screen: number
   /** Reports how many screens this document turned out to occupy. */
   onMeasured: (count: number) => void
+  /** Called with the page document so keyboard handling can be attached to it. */
+  onDocumentReady?: (doc: Document) => void
 }) {
   const frameRef = useRef<HTMLIFrameElement>(null)
 
@@ -43,11 +46,12 @@ export function ReflowableStage({
       ;(doc.head ?? doc.documentElement).appendChild(style)
     }
     style.textContent = reflowableStyles(frame, typography)
+    onDocumentReady?.(doc)
 
     // Force layout before measuring, otherwise the column count lags a setting change.
     void body.offsetWidth
     onMeasured(screenCount(body, frame.width))
-  }, [frame, typography, onMeasured])
+  }, [frame, typography, onMeasured, onDocumentReady])
 
   useEffect(() => {
     layout()
@@ -69,6 +73,7 @@ export function ReflowableStage({
         src={bookFileUrl(bookId, page.path)}
         sandbox="allow-same-origin"
         scrolling="no"
+        tabIndex={-1}
         onLoad={layout}
         style={{ width: frame.width, height: frame.height }}
       />

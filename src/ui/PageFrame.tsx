@@ -42,6 +42,10 @@ export function PageFrame({
       src={bookFileUrl(bookId, page.path)}
       sandbox="allow-same-origin"
       scrolling="no"
+      // Out of the tab order: a Tab press landing inside a page would take key
+      // events away from the app and break paging. Still reachable by screen
+      // readers, which navigate the accessibility tree rather than the tab order.
+      tabIndex={-1}
       onLoad={handleLoad}
       style={{
         width: page.viewport.width,

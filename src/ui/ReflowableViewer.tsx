@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ReflowableStage } from './ReflowableStage'
 import { useFrameSize } from './useFrameSize'
+import { usePageKeys } from './usePageKeys'
 import { DEFAULT_TYPOGRAPHY, type ReaderFont, type ReaderTheme, type Typography } from '../reader/typography'
 import type { ParsedBook } from '../engine/types'
 
@@ -73,15 +74,24 @@ export function ReflowableViewer({
 
   const forward = book.direction === 'rtl' ? -1 : 1
 
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent): void => {
+  const onKey = useCallback(
+    (event: KeyboardEvent): void => {
       if (event.key === 'ArrowRight' || event.key === 'PageDown' || event.key === ' ') turn(forward)
       else if (event.key === 'ArrowLeft' || event.key === 'PageUp') turn(-forward)
-      else if (event.key === 'Escape') onClose()
-    }
+      else if (event.key === 'Escape') {
+        if (menuOpen) setMenuOpen(false)
+        else onClose()
+      }
+    },
+    [turn, forward, onClose, menuOpen],
+  )
+
+  useEffect(() => {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [turn, forward, onClose])
+  }, [onKey])
+
+  const attachPageKeys = usePageKeys(onKey)
 
   const pointerStart = useRef<{ x: number; y: number } | null>(null)
   const onPointerUp = (event: React.PointerEvent): void => {
@@ -109,7 +119,7 @@ export function ReflowableViewer({
 
   return (
     <div className="viewer viewer-reflow">
-      <div
+      <main
         className="stage"
         ref={stageRef}
         onPointerDown={(event) => {
@@ -126,9 +136,10 @@ export function ReflowableViewer({
             typography={typography}
             screen={Math.max(screen, 0)}
             onMeasured={onMeasured}
+            onDocumentReady={attachPageKeys}
           />
         )}
-      </div>
+      </main>
 
       <header className={`chrome chrome-top${chromeVisible ? '' : ' hidden'}`}>
         <button className="icon-button" onClick={onClose} aria-label="Back to library">
@@ -146,7 +157,7 @@ export function ReflowableViewer({
       </header>
 
       {menuOpen && (
-        <div className="menu" role="dialog" aria-label="Text settings">
+        <div className="menu" role="group" aria-label="Text settings">
           <p className="menu-note">Text size</p>
           <div className="menu-row">
             <button className="chip" onClick={() => set('fontScale', Math.max(0.8, typography.fontScale - 0.15))}>

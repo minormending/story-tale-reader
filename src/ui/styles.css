@@ -86,7 +86,6 @@ button { font: inherit; cursor: pointer; }
   inset: 0;
   display: grid;
   place-items: center;
-  touch-action: pan-y;
 }
 
 .spread {
@@ -323,3 +322,44 @@ button { font: inherit; cursor: pointer; }
 .sample-inline { flex-direction: row; flex-wrap: wrap; justify-content: flex-start; margin-top: 0; }
 .sample-inline .chip { flex: 0 1 auto; padding: 0.5rem 1rem; }
 .sample-credit { font-size: 0.82rem; text-align: center; }
+
+/* ----------------------------- accessibility ----------------------------- */
+
+/*
+ * A visible focus ring. Without one, a keyboard or switch user cannot tell where
+ * they are — and the browser default is invisible against this dark palette.
+ */
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* On accent-filled controls an accent ring would vanish, so invert it. */
+.primary:focus-visible,
+.play:focus-visible,
+.chip-on:focus-visible {
+  outline-color: var(--fg);
+}
+
+.library-main { display: contents; }
+
+/*
+ * Suppress double-tap-to-zoom on the reading stage only: it would otherwise fight
+ * the tap-to-turn gesture. Pinch-zoom still works, here and everywhere else.
+ */
+.stage { touch-action: manipulation; }
+
+/* Destructive, but still a 44px target. */
+.shelf-remove { min-height: 44px; display: inline-flex; align-items: center; }
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

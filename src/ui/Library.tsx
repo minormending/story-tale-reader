@@ -81,6 +81,7 @@ export function Library({
       {error && <p className="banner banner-error">{error}</p>}
       {busy && <p className="banner banner-busy">{busy}</p>}
 
+      <main className="library-main">
       {entries.length === 0 ? (
         <div className={`dropzone${dragging ? ' dropzone-active' : ''}`}>
           <p className="dropzone-title">Your shelf is empty</p>
@@ -132,6 +133,7 @@ export function Library({
       {entries.length > 0 && !entries.some((entry) => entry.title === SAMPLE.title) && (
         <Sample onOpenFile={onOpenFile} busy={busy} inline />
       )}
+      </main>
 
       <DevCorpus onOpenFile={onOpenFile} />
 

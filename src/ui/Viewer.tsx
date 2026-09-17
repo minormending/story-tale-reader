@@ -6,6 +6,7 @@ import { modalViewport, DEFAULT_VIEWPORT } from '../engine/layout/viewport'
 import { PageFrame } from './PageFrame'
 import { PdfPage } from './PdfPage'
 import { useReadAlong, type ReadAlongSettings } from './useReadAlong'
+import { usePageKeys } from './usePageKeys'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import type { ZipArchive } from '../engine/zip/reader'
 import type { BookPage, Direction, LayoutOverrides, ParsedBook, Spread } from '../engine/types'
@@ -109,15 +110,33 @@ export function Viewer({
     onFinishedSpread: () => turn(forward),
   })
 
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent): void => {
+  const onKey = useCallback(
+    (event: KeyboardEvent): void => {
       if (event.key === 'ArrowRight' || event.key === 'PageDown' || event.key === ' ') turn(forward)
       else if (event.key === 'ArrowLeft' || event.key === 'PageUp') turn(-forward)
-      else if (event.key === 'Escape') onClose()
-    }
+      else if (event.key === 'Escape') {
+        // Back out one level at a time rather than leaving the book from the menu.
+        if (menuOpen) setMenuOpen(false)
+        else onClose()
+      }
+    },
+    [turn, forward, onClose, menuOpen],
+  )
+
+  useEffect(() => {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [turn, forward, onClose])
+  }, [onKey])
+
+  const attachPageKeys = usePageKeys(onKey)
+
+  const handlePageReady = useCallback(
+    (doc: Document, page: BookPage) => {
+      attachPageKeys(doc)
+      readAlong.onPageReady(doc, page)
+    },
+    [attachPageKeys, readAlong],
+  )
 
   const pointerStart = useRef<{ x: number; y: number } | null>(null)
   const onPointerDown = (event: React.PointerEvent): void => {
@@ -149,7 +168,7 @@ export function Viewer({
 
   return (
     <div className="viewer">
-      <div
+      <main
         className="stage"
         ref={stageRef}
         onPointerDown={onPointerDown}
@@ -168,13 +187,13 @@ export function Viewer({
                   bookId={bookId}
                   page={page}
                   scale={scale}
-                  onReady={readAlong.onPageReady}
+                  onReady={handlePageReady}
                 />
               )
             }
           />
         )}
-      </div>
+      </main>
 
       <header className={`chrome chrome-top${chromeVisible ? '' : ' hidden'}`}>
         <button
@@ -201,7 +220,7 @@ export function Viewer({
       </header>
 
       {menuOpen && (
-        <div className="menu" role="dialog" aria-label="Fix layout">
+        <div className="menu" role="group" aria-label="Fix layout">
           <p className="menu-note">
             {book.layout === 'pre-paginated' ? 'Fixed layout' : 'Reflowable'}
             {book.layoutInferred ? ' (detected)' : ''} · pairing from{' '}
