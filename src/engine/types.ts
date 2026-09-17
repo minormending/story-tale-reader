@@ -67,6 +67,8 @@ export interface ParsedBook {
   /** True when layout was inferred rather than declared — surfaced in the UI. */
   layoutInferred: boolean
   spread: SpreadPolicy
+  /** Which rule decided the spread pairing — shown in the UI so a wrong guess is explainable. */
+  spreadSource: 'explicit' | 'page-list' | 'index-parity'
   direction: Direction
   pages: BookPage[]
   nav: NavItem[]

@@ -137,6 +137,7 @@ export async function loadEpub(source: ByteSource, overrides: LayoutOverrides = 
     layout: decision.layout,
     layoutInferred: decision.inferred,
     spread: parseSpreadPolicy(pkg.meta.get('rendition:spread')),
+    spreadSource: assignment.source,
     direction: pkg.direction,
     pages,
     nav: nav.toc,

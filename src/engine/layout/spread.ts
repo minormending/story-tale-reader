@@ -208,3 +208,17 @@ export function spreadIndexOfPage(spreads: Spread[], pageIndex: number): number 
   }
   return 0
 }
+
+/**
+ * Re-phase pairing at render time so the user's shift toggle is instant.
+ * Equivalent to loading the book with `spreadShift: 1`; pages that stand alone
+ * (covers, pre-composed spreads) keep their place.
+ */
+export function applySpreadShift(pages: BookPage[], shift: 0 | 1): BookPage[] {
+  if (shift !== 1) return pages
+  return pages.map((page) =>
+    page.spreadSide === 'center'
+      ? page
+      : { ...page, spreadSide: page.spreadSide === 'left' ? 'right' : 'left' },
+  )
+}

@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Story Tale Reader">
+  <rect width="512" height="512" rx="112" fill="#15141a"/>
+  <!-- Two facing pages: the spread this reader exists to keep together. -->
+  <g transform="translate(76 124)">
+    <path d="M172 26v266c-44-26-104-32-160-20V14c56-12 116-6 160 12z" fill="#f6f1e6"/>
+    <path d="M188 26v266c44-26 104-32 160-20V14c-56-12-116-6-160 12z" fill="#fffaf0"/>
+    <path d="M172 26v266l8 10 8-10V26l-8-8z" fill="#cfc6b4"/>
+    <g fill="#c9c0ae">
+      <rect x="28" y="92" width="112" height="13" rx="6.5"/>
+      <rect x="28" y="132" width="90" height="13" rx="6.5"/>
+      <rect x="220" y="152" width="112" height="13" rx="6.5"/>
+      <rect x="220" y="192" width="90" height="13" rx="6.5"/>
+    </g>
+    <!-- A bird on the left page, where the illustration belongs. -->
+    <path d="M96 52c22 0 40 16 40 36 0 14-8 24-20 30l10 18-24-10c-26 2-46-14-46-38 0-20 18-36 40-36z" fill="#ffb454"/>
+    <circle cx="86" cy="80" r="6" fill="#2a1c05"/>
+    <path d="M118 84l20 6-20 8z" fill="#ef7d3a"/>
+  </g>
+</svg>
