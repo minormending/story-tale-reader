@@ -316,3 +316,5 @@ button { font: inherit; cursor: pointer; }
 .viewer-reflow .stage { background: var(--stage); }
 .reflow-slot { overflow: hidden; background: #fff; }
 .reflow-frame { border: 0; display: block; }
+
+.pdf-canvas { display: block; background: #fff; }

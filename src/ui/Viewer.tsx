@@ -3,14 +3,20 @@ import { SpreadView } from './SpreadView'
 import { useFrameSize } from './useFrameSize'
 import { applySpreadShift, buildSpreads, shouldPair } from '../engine/layout/spread'
 import { modalViewport, DEFAULT_VIEWPORT } from '../engine/layout/viewport'
+import { PageFrame } from './PageFrame'
+import { PdfPage } from './PdfPage'
 import { useReadAlong, type ReadAlongSettings } from './useReadAlong'
+import type { PDFDocumentProxy } from 'pdfjs-dist'
 import type { ZipArchive } from '../engine/zip/reader'
 import type { BookPage, Direction, LayoutOverrides, ParsedBook, Spread } from '../engine/types'
 
 export interface ViewerProps {
   bookId: string
   book: ParsedBook
+  /** Present for EPUBs. */
   archive: ZipArchive | undefined
+  /** Present for PDFs. */
+  pdf?: PDFDocumentProxy
   /** Spine index to resume from. */
   initialPageIndex: number
   overrides: LayoutOverrides
@@ -25,6 +31,7 @@ export function Viewer({
   bookId,
   book,
   archive,
+  pdf,
   initialPageIndex,
   overrides,
   onOverridesChange,
@@ -150,11 +157,21 @@ export function Viewer({
       >
         {spread && (
           <SpreadView
-            bookId={bookId}
             spread={spread}
             modal={modal}
             frame={frame}
-            onPageReady={readAlong.onPageReady}
+            renderPage={(page, scale) =>
+              pdf ? (
+                <PdfPage document={pdf} page={page} scale={scale} />
+              ) : (
+                <PageFrame
+                  bookId={bookId}
+                  page={page}
+                  scale={scale}
+                  onReady={readAlong.onPageReady}
+                />
+              )
+            }
           />
         )}
       </div>

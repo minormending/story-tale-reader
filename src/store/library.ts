@@ -1,7 +1,10 @@
 /** The library: persisted book records, covers, reading position and overrides. */
 
 import { loadEpub } from '../engine/epub/load'
+import { loadPdf, renderPdfPage } from '../engine/pdf/load'
+import { detectBlobFormat } from '../engine/format'
 import { ZipArchive, blobSource } from '../engine/zip/reader'
+import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { dirname, resolvePath, mimeTypeFor } from '../engine/path'
 import { primaryImageHref } from '../engine/layout/viewport'
 import type { BookFormat, LayoutMode, LayoutOverrides, ParsedBook } from '../engine/types'
@@ -34,7 +37,10 @@ export interface Progress {
 export interface OpenedBook {
   entry: LibraryEntry
   book: ParsedBook
-  archive: ZipArchive
+  /** Present for EPUBs — the source for the virtual filesystem and read-along. */
+  archive?: ZipArchive
+  /** Present for PDFs. */
+  pdf?: PDFDocumentProxy
 }
 
 const THUMBNAIL_WIDTH = 480
@@ -56,32 +62,59 @@ export async function listLibrary(): Promise<LibraryEntry[]> {
   return entries.sort((a, b) => b.lastOpenedAt - a.lastOpenedAt)
 }
 
+/** Open a blob as whatever it actually is, rather than trusting its extension. */
+async function parse(blob: Blob, fileName: string): Promise<Omit<OpenedBook, 'entry'>> {
+  const format = await detectBlobFormat(blob)
+
+  if (format === 'pdf') {
+    const { book, document } = await loadPdf(await blob.arrayBuffer(), stripExtension(fileName))
+    return { book, pdf: document }
+  }
+
+  if (format === 'mobi') {
+    const { loadMobi } = await import('../engine/mobi/load')
+    const { book, archive } = await loadMobi(new Uint8Array(await blob.arrayBuffer()), stripExtension(fileName))
+    return { book, archive }
+  }
+
+  if (format === 'unknown') {
+    throw new Error('This file is not an EPUB, PDF or MOBI book.')
+  }
+
+  const { book, archive } = await loadEpub(blobSource(blob))
+  return { book, archive }
+}
+
+function stripExtension(name: string): string {
+  return name.replace(/\.[^.]+$/, '') || 'Untitled'
+}
+
 export async function importBook(file: File): Promise<OpenedBook> {
   const id = await fingerprint(file)
   const existing = await get<LibraryEntry>(STORE_BOOKS, id)
 
   // Parse before storing: a book we cannot open should not enter the library.
-  const { book, archive } = await loadEpub(blobSource(file))
+  const opened = await parse(file, file.name)
 
   await saveBookFile(id, file)
   void requestPersistence()
 
   const entry: LibraryEntry = {
     id,
-    title: book.metadata.title,
-    creator: book.metadata.creator,
-    format: book.format,
+    title: opened.book.metadata.title,
+    creator: opened.book.metadata.creator,
+    format: opened.book.format,
     fileName: file.name,
     size: file.size,
     addedAt: existing?.addedAt ?? Date.now(),
     lastOpenedAt: Date.now(),
-    pageCount: book.pages.length,
-    layout: book.layout,
-    hasMediaOverlays: book.hasMediaOverlays,
-    cover: existing?.cover ?? (await extractCover(archive, book)),
+    pageCount: opened.book.pages.length,
+    layout: opened.book.layout,
+    hasMediaOverlays: opened.book.hasMediaOverlays,
+    cover: existing?.cover ?? (await makeCover(opened)),
   }
   await put(STORE_BOOKS, entry)
-  return { entry, book, archive }
+  return { entry, ...opened }
 }
 
 export async function openStoredBook(id: string): Promise<OpenedBook> {
@@ -91,10 +124,10 @@ export async function openStoredBook(id: string): Promise<OpenedBook> {
   const blob = await loadBookFile(id)
   if (!blob) throw new Error('The book file is missing from storage. Import it again.')
 
-  const { book, archive } = await loadEpub(blobSource(blob))
+  const opened = await parse(blob, entry.fileName)
   const touched: LibraryEntry = { ...entry, lastOpenedAt: Date.now() }
   await put(STORE_BOOKS, touched)
-  return { entry: touched, book, archive }
+  return { entry: touched, ...opened }
 }
 
 export async function deleteBook(id: string): Promise<void> {
@@ -136,6 +169,30 @@ export async function saveOverrides(id: string, overrides: LayoutOverrides): Pro
  * A downscaled cover for the shelf. Stored as a thumbnail rather than the book's
  * full-size image so the library stays fast and small on a tablet.
  */
+async function makeCover(opened: Omit<OpenedBook, 'entry'>): Promise<Blob | undefined> {
+  if (opened.pdf) return pdfCover(opened.pdf)
+  if (opened.archive) return extractCover(opened.archive, opened.book)
+  return undefined
+}
+
+/** First page of a PDF, rendered small. */
+async function pdfCover(document: PDFDocumentProxy): Promise<Blob | undefined> {
+  if (typeof OffscreenCanvas !== 'function') return undefined
+  try {
+    const page = await document.getPage(1)
+    const base = page.getViewport({ scale: 1 })
+    const scale = THUMBNAIL_WIDTH / base.width
+    const canvas = new OffscreenCanvas(1, 1) as unknown as HTMLCanvasElement
+    await renderPdfPage(document, 1, canvas, scale, 1)
+    return await (canvas as unknown as OffscreenCanvas).convertToBlob({
+      type: 'image/webp',
+      quality: 0.82,
+    })
+  } catch {
+    return undefined
+  }
+}
+
 async function extractCover(archive: ZipArchive, book: ParsedBook): Promise<Blob | undefined> {
   const path = book.coverPath ?? (await firstPageImage(archive, book))
   if (!path || !archive.has(path)) return undefined

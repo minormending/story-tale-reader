@@ -61,7 +61,7 @@ export function Library({
         <input
           ref={inputRef}
           type="file"
-          accept=".epub,application/epub+zip"
+          accept=".epub,.pdf,.mobi,.azw3,.prc,application/epub+zip,application/pdf"
           multiple
           hidden
           onChange={(event) => {

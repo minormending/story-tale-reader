@@ -36,25 +36,20 @@ export function PageFrame({
   )
 
   return (
-    <div
-      className="page-slot"
-      style={{ width: page.viewport.width * scale, height: page.viewport.height * scale }}
-    >
-      <iframe
-        className="page-frame"
-        title={`Page ${page.printedPage ?? page.index + 1}`}
-        src={bookFileUrl(bookId, page.path)}
-        sandbox="allow-same-origin"
-        scrolling="no"
-        onLoad={handleLoad}
-        style={{
-          width: page.viewport.width,
-          height: page.viewport.height,
-          transform: `scale(${scale})`,
-          transformOrigin: '0 0',
-        }}
-      />
-    </div>
+    <iframe
+      className="page-frame"
+      title={`Page ${page.printedPage ?? page.index + 1}`}
+      src={bookFileUrl(bookId, page.path)}
+      sandbox="allow-same-origin"
+      scrolling="no"
+      onLoad={handleLoad}
+      style={{
+        width: page.viewport.width,
+        height: page.viewport.height,
+        transform: `scale(${scale})`,
+        transformOrigin: '0 0',
+      }}
+    />
   )
 }
 

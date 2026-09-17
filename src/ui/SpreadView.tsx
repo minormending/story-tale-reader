@@ -1,4 +1,4 @@
-import { PageFrame } from './PageFrame'
+import type { ReactNode } from 'react'
 import type { BookPage, Spread, Viewport } from '../engine/types'
 import type { Size } from './useFrameSize'
 
@@ -26,17 +26,16 @@ export function fitScale(content: Viewport, frame: Size): number {
 }
 
 export function SpreadView({
-  bookId,
   spread,
   modal,
   frame,
-  onPageReady,
+  renderPage,
 }: {
-  bookId: string
   spread: Spread
   modal: Viewport
   frame: Size
-  onPageReady?: (doc: Document, page: BookPage) => void
+  /** How to draw one page: an iframe for EPUB, a canvas for PDF. */
+  renderPage: (page: BookPage, scale: number) => ReactNode
 }) {
   const content = spreadContentSize(spread, modal)
   const scale = fitScale(content, frame)
@@ -52,7 +51,13 @@ export function SpreadView({
       style={{ width: content.width * scale, height: content.height * scale }}
     >
       {pages.map((page) => (
-        <PageFrame key={page.index} bookId={bookId} page={page} scale={scale} onReady={onPageReady} />
+        <div
+          key={page.index}
+          className="page-slot"
+          style={{ width: page.viewport.width * scale, height: page.viewport.height * scale }}
+        >
+          {renderPage(page, scale)}
+        </div>
       ))}
     </div>
   )

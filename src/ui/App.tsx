@@ -10,12 +10,14 @@ import {
   saveOverrides, saveProgress, type LibraryEntry, type OpenedBook,
 } from '../store/library'
 import type { ZipArchive } from '../engine/zip/reader'
+import type { PDFDocumentProxy } from 'pdfjs-dist'
 import type { LayoutOverrides, ParsedBook } from '../engine/types'
 
 interface Session {
   bookId: string
   book: ParsedBook
-  archive: ZipArchive
+  archive?: ZipArchive
+  pdf?: PDFDocumentProxy
   entry: LibraryEntry
   initialPageIndex: number
   initialScreen: number
@@ -36,7 +38,9 @@ export function App() {
 
   const enter = useCallback(async (opened: OpenedBook) => {
     const { entry, book, archive } = opened
-    mountBook(entry.id, archive)
+    // Only EPUBs are served through the virtual filesystem; a PDF is held in memory
+    // by pdf.js and a MOBI is unpacked into a synthetic container.
+    if (archive) mountBook(entry.id, archive)
     const [storedOverrides, position] = await Promise.all([
       getOverrides(entry.id),
       getProgress(entry.id),
@@ -49,6 +53,7 @@ export function App() {
         book,
         archive,
         entry,
+        pdf: opened.pdf,
         initialPageIndex: position.pageIndex,
         initialScreen: position.screen,
       }
@@ -152,6 +157,7 @@ export function App() {
         bookId={session.bookId}
         book={session.book}
         archive={session.archive}
+        pdf={session.pdf}
         initialPageIndex={session.initialPageIndex}
         overrides={overrides}
         onOverridesChange={changeOverrides}

@@ -4,7 +4,7 @@
 > Ships as an installable PWA on GitHub Pages **and** as a sideloadable Android APK from GitHub Releases.
 
 App name: **Story Tale Reader** · Android id: `com.kramdath.storytalereader`
-Status: **v1 — accepted** · Last updated: 2026-09-17
+Status: **M0–M7 built** · Last updated: 2026-09-17
 
 ---
 
@@ -529,20 +529,33 @@ Visual correctness is the entire product, so the test strategy is weighted towar
 
 ## 13. Milestones
 
-| # | Deliverable | Scope |
+| # | Deliverable | Status |
 |---|---|---|
-| **M0** | Skeleton | Repo, TS/Vite/React, CI typecheck+test, Pages deploy of a stub |
-| **M1** | **Fixed-layout EPUB reader** ← *fixes F1, F2, F3* | Zip reader, OPF parsing, SW VFS, FXL detection, viewport resolution, spread pairing + shift override, iframe scaling, tap/swipe paging, single-page & spread modes |
-| **M2** | Library & persistence | Import, OPFS storage, covers, progress, per-book overrides, PWA install |
-| **M3** | **Read-along** | SMIL parsing, rAF-driven highlight, tap-to-seek, rate control, auto-advance |
-| **M4** | **APK** | Capacitor shell, intent filters, signed release workflow |
-| **M5** | Reflowable EPUB | Column pagination, typography settings, themes, CFI positions |
-| **M6** | PDF | pdf.js integration into the existing shell |
-| **M7** | MOBI/AZW3 | KF8 → reflowable; legacy MOBI best-effort |
+| **M0** | Skeleton, CI, Pages deploy | ✅ |
+| **M1** | **Fixed-layout EPUB reader** — *fixes F1, F2, F3* | ✅ |
+| **M2** | Library, OPFS storage, covers, resume, per-book overrides | ✅ |
+| **M3** | **Read-along** — SMIL, word highlighting, tap-to-seek | ✅ |
+| **M4** | **APK** — Capacitor shell, intent filters, signed release workflow | ✅ built in CI |
+| **M5** | Reflowable EPUB — column pagination, typography, themes | ✅ |
+| **M6** | PDF via pdf.js | ✅ |
+| **M7** | MOBI / AZW3 | ✅ except HUFF/CDIC |
 
-**M1 is the whole point.** After M1 the reference book renders correctly, which is
-more than every app tried so far manages. M4 makes it installable on the tablet.
-Everything after that is breadth.
+### Known gaps
+
+- **HUFF/CDIC-compressed MOBI** (compression type 17480) is detected and refused with
+  an explanation rather than rendered as rubbish. Uncompressed and PalmDOC-compressed
+  books, which includes all KF8/AZW3, work. Implementing HUFF/CDIC without a sample
+  file to verify against would have meant shipping unverifiable bit-twiddling.
+- **The Android intent handling has not run on a physical device.** It compiles in CI
+  and the plugin is present in the APK, but "Open with" from a file manager is
+  unverified until someone installs the build. Everything else is web code that has
+  been exercised running.
+- **Bookmarks** are still unscoped (§16.3 deferred them to M5 or later); resume
+  position ships and works.
+- **CFI** position tracking was specified for reflowable books (§5.5). The
+  implementation stores section index plus screen index instead, which survives a
+  font-size change within a section but not across one. Worth revisiting when
+  bookmarks land.
 
 ---
 
