@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Library } from './Library'
 import { Viewer } from './Viewer'
+import { ReflowableViewer } from './ReflowableViewer'
 import { DrmError } from '../engine/epub/ocf'
 import { mountBook, startVfs, unmountBook, type VfsStatus } from '../vfs/client'
 import { onBookOpened, takeIncomingBook } from '../native/bookIntent'
@@ -17,6 +18,7 @@ interface Session {
   archive: ZipArchive
   entry: LibraryEntry
   initialPageIndex: number
+  initialScreen: number
 }
 
 export function App() {
@@ -35,14 +37,21 @@ export function App() {
   const enter = useCallback(async (opened: OpenedBook) => {
     const { entry, book, archive } = opened
     mountBook(entry.id, archive)
-    const [storedOverrides, pageIndex] = await Promise.all([
+    const [storedOverrides, position] = await Promise.all([
       getOverrides(entry.id),
       getProgress(entry.id),
     ])
     setOverrides(storedOverrides)
     setSession((previous) => {
       if (previous && previous.bookId !== entry.id) unmountBook(previous.bookId)
-      return { bookId: entry.id, book, archive, entry, initialPageIndex: pageIndex }
+      return {
+        bookId: entry.id,
+        book,
+        archive,
+        entry,
+        initialPageIndex: position.pageIndex,
+        initialScreen: position.screen,
+      }
     })
     setEntries(await listLibrary())
   }, [])
@@ -121,6 +130,23 @@ export function App() {
   }, [])
 
   if (session) {
+    // A book's layout decides which renderer it gets; the override lets the reader
+    // correct a book whose metadata lies.
+    const layout = overrides.forceLayout ?? session.book.layout
+    if (layout === 'reflowable') {
+      return (
+        <ReflowableViewer
+          bookId={session.bookId}
+          book={session.book}
+          initialPageIndex={session.initialPageIndex}
+          initialScreen={session.initialScreen}
+          onPositionChange={(pageIndex, screen) =>
+            void saveProgress(session.bookId, pageIndex, screen)
+          }
+          onClose={close}
+        />
+      )
+    }
     return (
       <Viewer
         bookId={session.bookId}

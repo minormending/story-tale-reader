@@ -46,7 +46,9 @@ export default defineConfig({
       },
     }),
   ],
-  build: { target: 'es2022', sourcemap: true },
+  // Source maps are 1.5MB of dead weight inside the APK; opt in when debugging a
+  // deployed build with SOURCEMAP=true.
+  build: { target: 'es2022', sourcemap: process.env.SOURCEMAP === 'true' },
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts'],

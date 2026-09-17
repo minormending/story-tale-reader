@@ -26,6 +26,8 @@ export interface LibraryEntry {
 export interface Progress {
   id: string
   pageIndex: number
+  /** Screen within a reflowable section; unused for fixed-layout books. */
+  screen?: number
   updatedAt: number
 }
 
@@ -106,12 +108,13 @@ export async function deleteBook(id: string): Promise<void> {
 
 /* ----------------------------- reading position ----------------------------- */
 
-export async function getProgress(id: string): Promise<number> {
-  return (await get<Progress>(STORE_PROGRESS, id))?.pageIndex ?? 0
+export async function getProgress(id: string): Promise<{ pageIndex: number; screen: number }> {
+  const stored = await get<Progress>(STORE_PROGRESS, id)
+  return { pageIndex: stored?.pageIndex ?? 0, screen: stored?.screen ?? 0 }
 }
 
-export async function saveProgress(id: string, pageIndex: number): Promise<void> {
-  await put(STORE_PROGRESS, { id, pageIndex, updatedAt: Date.now() } satisfies Progress)
+export async function saveProgress(id: string, pageIndex: number, screen = 0): Promise<void> {
+  await put(STORE_PROGRESS, { id, pageIndex, screen, updatedAt: Date.now() } satisfies Progress)
 }
 
 /* -------------------------------- overrides -------------------------------- */

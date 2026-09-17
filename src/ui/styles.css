@@ -310,3 +310,9 @@ button { font: inherit; cursor: pointer; }
 .play:active { transform: scale(0.96); }
 
 .menu-rule { border: 0; border-top: 1px solid var(--line); margin: 0.2rem 0; width: 100%; }
+
+/* ------------------------------ reflowable ------------------------------ */
+
+.viewer-reflow .stage { background: var(--stage); }
+.reflow-slot { overflow: hidden; background: #fff; }
+.reflow-frame { border: 0; display: block; }
