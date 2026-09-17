@@ -8,6 +8,12 @@ interface CorpusBook {
   size: number
 }
 
+const SAMPLE = {
+  path: 'sample/peter-rabbit.epub',
+  title: 'The Tale of Peter Rabbit',
+  credit: 'Beatrix Potter, 1902 \u00b7 public domain',
+}
+
 export function Library({
   entries,
   onOpenFile,
@@ -78,7 +84,8 @@ export function Library({
       {entries.length === 0 ? (
         <div className={`dropzone${dragging ? ' dropzone-active' : ''}`}>
           <p className="dropzone-title">Your shelf is empty</p>
-          <p className="muted">Drop an EPUB here, or use &ldquo;Add a book&rdquo;.</p>
+          <p className="muted">Drop a book here, or use &ldquo;Add a book&rdquo;.</p>
+          <Sample onOpenFile={onOpenFile} busy={busy} />
         </div>
       ) : (
         <ul className={`shelf${dragging ? ' shelf-dragging' : ''}`}>
@@ -120,6 +127,10 @@ export function Library({
             </li>
           ))}
         </ul>
+      )}
+
+      {entries.length > 0 && !entries.some((entry) => entry.title === SAMPLE.title) && (
+        <Sample onOpenFile={onOpenFile} busy={busy} inline />
       )}
 
       <DevCorpus onOpenFile={onOpenFile} />
@@ -197,6 +208,44 @@ function DevCorpus({ onOpenFile }: { onOpenFile: (file: File) => void }) {
           </button>
         ))}
       </div>
+    </div>
+  )
+}
+
+/**
+ * One-tap import of the bundled public-domain picture book, so a first-time visitor
+ * can see what the reader actually does without having to find an EPUB first.
+ */
+function Sample({
+  onOpenFile,
+  busy,
+  inline,
+}: {
+  onOpenFile: (file: File) => void
+  busy: string | null
+  inline?: boolean
+}) {
+  const [failed, setFailed] = useState(false)
+  if (failed) return null
+
+  const open = (): void => {
+    void fetch(`${import.meta.env.BASE_URL}${SAMPLE.path}`)
+      .then((response) => {
+        if (!response.ok) throw new Error(String(response.status))
+        return response.blob()
+      })
+      .then((blob) => onOpenFile(new File([blob], 'peter-rabbit.epub')))
+      .catch(() => setFailed(true))
+  }
+
+  return (
+    <div className={inline ? 'sample sample-inline' : 'sample'}>
+      <button className={inline ? 'chip' : 'primary'} onClick={open} disabled={!!busy}>
+        Read the sample book
+      </button>
+      <span className="muted sample-credit">
+        {SAMPLE.title} &mdash; {SAMPLE.credit}
+      </span>
     </div>
   )
 }

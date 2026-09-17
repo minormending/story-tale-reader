@@ -39,6 +39,10 @@ shipping inside the books.
 Books stay on your device. Add them with the file picker, by dropping them on the
 window, or — on Android — with "Open with" from any file manager.
 
+A public-domain sample, **The Tale of Peter Rabbit** (Beatrix Potter, 1902), is one
+tap away on the empty shelf, so you can see what the reader does before finding a
+book of your own.
+
 ## Development
 
 ```bash
@@ -52,6 +56,7 @@ npm run dev
 | `npm test` | Unit tests (90, no browser needed) |
 | `npm run fixtures` | Regenerate the synthetic test books in `corpus/fixtures/` |
 | `npm run icons` | Rasterise `public/icon.svg` into PWA and Android icons |
+| `npm run sample` | Rebuild the bundled Peter Rabbit sample from its public-domain source |
 | `npm run android:sync` | Build the web app and sync it into the Capacitor project |
 
 Put real books for testing in `corpus/local/` — that directory is gitignored, because

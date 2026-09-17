@@ -23,4 +23,7 @@ android/app/release/
 android/capacitor-cordova-android-plugins/
 android/app/src/main/assets/public/
 *.keystore
+*.keystore.b64
 *.jks
+keystore-credentials.txt
+.cache/

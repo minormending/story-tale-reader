@@ -594,7 +594,7 @@ build — one env-driven config value, easy to get wrong, worth a test.
 
 ## 16. Open questions & resolutions
 
-1. **Sample book** — *deferred, blocks shipping only.* Development and testing run against the real (in-copyright, gitignored) reference book in `corpus/local/`, plus committed synthetic fixtures. A public-domain replacement must be sourced or authored before the first public release; until then the Pages deploy opens to an empty library with an import prompt.
+1. ~~**Sample book**~~ **Resolved: *The Tale of Peter Rabbit*** (Beatrix Potter, 1902), built by `npm run sample` from Project Gutenberg ebook 14838 and committed at `public/sample/peter-rabbit.epub` (1.6MB, 30 pages). Public domain worldwide — published 1902, and Potter died in 1943, so it cleared life+70 in 2014. All Project Gutenberg branding is stripped, so none of their trademark terms apply. Gutenberg ships it *reflowable* (image, then text beneath), which is the exact shape this reader exists to improve on; the sample re-lays it out fixed-layout with the text positioned on each page, and deliberately carries no `page-spread-*` properties so it exercises page-list parity.
 2. ~~**App/repo name**~~ **Resolved: "Story Tale Reader"**, repo `story-tale-reader`, Android application id `com.kramdath.storytalereader`.
 3. ~~**Bookmarks in v1, or M5?**~~ **Resolved: M5 or later.** Not in the M1–M4 scope. Resume-position (§6.2) is separate and ships in M2.
 4. ~~**Landscape phone**: spread or single page?~~ **Resolved: always spread in landscape.** No minimum per-page width gate — if the frame is landscape and `rendition:spread` allows it, pair the pages. Pinch-zoom (§6.2) covers the small-screen case.

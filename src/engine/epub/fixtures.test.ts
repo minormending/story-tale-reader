@@ -90,3 +90,43 @@ describe.skipIf(!has('reflowable-chapters'))('fixture: reflowable', () => {
     expect(book.layout).toBe('pre-paginated')
   })
 })
+
+describe.skipIf(!existsSync('public/sample/peter-rabbit.epub'))('the bundled sample book', () => {
+  it('is a fixed-layout book that pairs from its page-list', async () => {
+    const { book } = await loadEpub(
+      bufferSource(readFileSync('public/sample/peter-rabbit.epub')),
+    )
+
+    expect(book.metadata.title).toBe('The Tale of Peter Rabbit')
+    expect(book.metadata.creator).toBe('Beatrix Potter')
+    expect(book.layout).toBe('pre-paginated')
+    expect(book.layoutInferred).toBe(false)
+    expect(book.spread).toBe('landscape')
+    expect(book.pages.length).toBe(30)
+    expect(book.coverPath).toBe('OEBPS/images/cover.jpg')
+
+    // Every page is the same portrait viewport.
+    for (const page of book.pages) expect(page.viewport).toEqual({ width: 800, height: 1200 })
+
+    // No spine hints, so parity comes from printed page numbers — the case that
+    // breaks other readers.
+    expect(book.spreadSource).toBe('page-list')
+
+    const spreads = buildSpreads(book.pages, book.direction, true)
+    // Cover alone as a recto, then facing pairs all the way through.
+    expect(spreads[0]!.right?.path).toBe('OEBPS/cover.xhtml')
+    expect(spreads[0]!.left).toBeUndefined()
+    expect(spreads[1]!.left?.path).toBe('OEBPS/title.xhtml')
+    expect(spreads[1]!.right?.path).toBe('OEBPS/p01.xhtml')
+  })
+
+  it('carries no Project Gutenberg branding', async () => {
+    const { book, archive } = await loadEpub(
+      bufferSource(readFileSync('public/sample/peter-rabbit.epub')),
+    )
+    for (const page of book.pages) {
+      const text = await archive.readText(page.path)
+      expect(text).not.toMatch(/gutenberg/i)
+    }
+  })
+})
