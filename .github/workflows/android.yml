@@ -29,7 +29,15 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - uses: android-actions/setup-android@v3
+      # The ubuntu runner image already ships the Android SDK. android-actions/setup-android
+      # still tries to install the long-removed 'tools' package and fails, so drive
+      # sdkmanager directly and install only what this build needs.
+      - name: Prepare Android SDK
+        run: |
+          SDKMANAGER="$(command -v sdkmanager || find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f | head -1)"
+          echo "Using $SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
+          "$SDKMANAGER" "platform-tools" "platforms;android-36" "build-tools;36.0.0" > /dev/null
 
       - run: npm ci
 
