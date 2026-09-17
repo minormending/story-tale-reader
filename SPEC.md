@@ -35,7 +35,7 @@ rendition:orientation  auto
 page viewport          800 × 1200 CSS px    ← declared in every page's <meta viewport>
 images                 800 × 1199 JPG, one per page (NOT pre-composed spreads)
 text                   real, selectable, absolutely positioned over the image
-audio                  1 × 6m48s .m4a + 28 SMIL files with per-WORD timings
+audio                  1 × 6m48s .m4a + 27 SMIL files with per-WORD timings
 spread hints           ABSENT from the spine  ← this is what breaks F3
 page-list              present, cover=1 … page032=32  ← this is how we fix F3
 ```
@@ -403,7 +403,7 @@ one-tap user correction is worth more than a cleverer heuristic.
 
 ## 7. Read-along / Media Overlays
 
-The reference book carries a 6:48 `.m4a` and 28 SMIL files with **per-word**
+The reference book carries a 6:48 `.m4a` and 27 SMIL files with **per-word**
 timings — a feature essentially no Android reader implements. This is the headline
 differentiator.
 
@@ -600,7 +600,7 @@ Page viewport    800 × 1200 CSS px (per-document <meta name="viewport">)
 Images           800 × 1199 JPEG, one per page
 Fonts            9 embedded WOFF (Times LT, Futura Std, ZiptyDo, AGaramond)
 Audio            audio/abforthebirds.m4a — 6:48
-Media overlays   28 SMIL files, per-word <par>; shortest word 62 ms
+Media overlays   27 SMIL files, per-word <par>; shortest word 62 ms
 active-class     -epub-media-overlay-active  (styled red by the book's own CSS)
 Spread hints     NONE in spine → derive from nav page-list (cover=1 … page032=32)
 Text blocks      up to 3 independently positioned blocks per page (e.g. page025)
