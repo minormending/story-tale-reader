@@ -5,6 +5,9 @@ import { usePageKeys } from './usePageKeys'
 import { usePageGestures } from './usePageGestures'
 import { useWakeLock } from './useWakeLock'
 import { LockButton } from './LockButton'
+import { BookmarkToggle, BookmarksSection } from './Bookmarks'
+import { captureAnchor, screenForAnchor } from '../reader/anchor'
+import { addBookmark, listBookmarks, removeBookmark, type Bookmark } from '../store/bookmarks'
 import { DEFAULT_TYPOGRAPHY, type ReaderFont, type ReaderTheme, type Typography } from '../reader/typography'
 import { InlinePageResolver } from '../vfs/inline'
 import { isVfsReady } from '../vfs/client'
@@ -66,8 +69,29 @@ export function ReflowableViewer({
     if (section) notify.current(section.index, Math.max(screen, 0))
   }, [section, screen])
 
+  /** The page document, for measuring bookmark anchors. */
+  const docRef = useRef<Document | null>(null)
+  const frameWidthRef = useRef(0)
+  frameWidthRef.current = frame.width
+  /** An anchor waiting for its section to finish laying out before it can resolve. */
+  const pendingAnchor = useRef<number | undefined>(undefined)
+
   const onMeasured = useCallback((count: number) => {
     setScreenCount(count)
+
+    // A bookmark jumped into this section; only now that it has columns can the
+    // anchored element be asked which screen it fell on.
+    const anchor = pendingAnchor.current
+    if (anchor !== undefined) {
+      pendingAnchor.current = undefined
+      const doc = docRef.current
+      const resolved = doc ? screenForAnchor(doc, frameWidthRef.current, anchor) : undefined
+      if (resolved !== undefined) {
+        setScreen(Math.min(resolved, count - 1))
+        return
+      }
+    }
+
     // Resolve a backwards page turn that landed at the end of the previous section.
     setScreen((current) => (current === LAST_SCREEN ? count - 1 : Math.min(current, count - 1)))
   }, [])
@@ -128,10 +152,74 @@ export function ReflowableViewer({
 
   const onPageDocument = useCallback(
     (doc: Document) => {
+      docRef.current = doc
       attachPageKeys(doc)
       gestures.attachToPage(doc)
     },
     [attachPageKeys, gestures],
+  )
+
+  /* ------------------------------ bookmarks ------------------------------ */
+
+  const [bookmarks, setBookmarks] = useState<Bookmark[]>([])
+  useEffect(() => {
+    void listBookmarks(bookId).then(setBookmarks)
+  }, [bookId])
+
+  const refresh = useCallback(async () => {
+    setBookmarks(await listBookmarks(bookId))
+  }, [bookId])
+
+  /**
+   * Which bookmark, if any, is on the screen being read. Resolved rather than
+   * compared: the stored anchor is an element, and the screen it sits on depends
+   * on the type size in force right now.
+   */
+  const bookmarkHere = useMemo(() => {
+    const doc = docRef.current
+    if (!doc || !section) return undefined
+    return bookmarks.find((bookmark) => {
+      if (bookmark.pageIndex !== section.index || bookmark.anchor === undefined) return false
+      return screenForAnchor(doc, frame.width, bookmark.anchor) === Math.max(screen, 0)
+    })
+  }, [bookmarks, section, frame.width, screen])
+
+  const toggleBookmark = useCallback(async () => {
+    if (bookmarkHere) {
+      await removeBookmark(bookmarkHere.id)
+    } else {
+      const doc = docRef.current
+      const point = doc ? captureAnchor(doc, frame.width) : undefined
+      if (!section || !point) return
+      await addBookmark({
+        bookId,
+        pageIndex: section.index,
+        anchor: point.index,
+        label: `Section ${sectionIndex + 1}`,
+        excerpt: point.excerpt,
+      })
+    }
+    await refresh()
+  }, [bookmarkHere, section, sectionIndex, bookId, frame.width, refresh])
+
+  const jumpTo = useCallback(
+    (bookmark: Bookmark) => {
+      setMenuOpen(false)
+      const target = sections.findIndex((page) => page.index === bookmark.pageIndex)
+      if (target === -1 || bookmark.anchor === undefined) return
+
+      if (target === sectionIndex) {
+        const doc = docRef.current
+        const resolved = doc ? screenForAnchor(doc, frame.width, bookmark.anchor) : undefined
+        if (resolved !== undefined) setScreen(Math.min(resolved, screenCount - 1))
+        return
+      }
+
+      // Another section: it has to be laid out before the anchor means anything.
+      pendingAnchor.current = bookmark.anchor
+      setSectionIndex(target)
+    },
+    [sections, sectionIndex, frame.width, screenCount],
   )
 
   const set = <K extends keyof Typography>(key: K, value: Typography[K]): void =>
@@ -171,13 +259,19 @@ export function ReflowableViewer({
         </div>
         <div className="chrome-actions">
           {!locked && (
-            <button
-              className="icon-button"
-              onClick={() => setMenuOpen((open) => !open)}
-              aria-expanded={menuOpen}
-            >
-              Text
-            </button>
+            <>
+              <BookmarkToggle
+                bookmarked={bookmarkHere !== undefined}
+                onToggle={() => void toggleBookmark()}
+              />
+              <button
+                className="icon-button"
+                onClick={() => setMenuOpen((open) => !open)}
+                aria-expanded={menuOpen}
+              >
+                Text
+              </button>
+            </>
           )}
           <LockButton
             locked={locked}
@@ -191,7 +285,12 @@ export function ReflowableViewer({
       </header>
 
       {menuOpen && (
-        <div className="menu" role="group" aria-label="Text settings">
+        <div className="menu" role="group" aria-label="Reading options">
+          <BookmarksSection
+            bookmarks={bookmarks}
+            onJump={jumpTo}
+            onRemove={(bookmark) => void removeBookmark(bookmark.id).then(refresh)}
+          />
           <p className="menu-note">Text size</p>
           <div className="menu-row">
             <button className="chip" onClick={() => set('fontScale', Math.max(0.8, typography.fontScale - 0.15))}>

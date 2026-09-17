@@ -567,8 +567,8 @@ Visual correctness is the entire product, so the test strategy is weighted towar
   and the plugin is present in the APK, but "Open with" from a file manager is
   unverified until someone installs the build. Everything else is web code that has
   been exercised running.
-- **Bookmarks** are still unscoped (§16.3 deferred them to M5 or later); resume
-  position ships and works.
+- ~~**Bookmarks**~~ **Built.** A toggle in the reader's toolbar and a list in its
+  menu; removing a book takes its bookmarks with it.
 - **Pinch-zoom and lock mode are verified with a mouse and synthetic pointer
   events, not a touchscreen.** Touch differs in ways that matter here — it captures
   a pointer to its original target, and the browser arbitrates multi-touch
@@ -576,10 +576,23 @@ Visual correctness is the entire product, so the test strategy is weighted towar
   device. The wake lock could only be observed failing with `NotAllowedError: the
   requesting page is not visible`, which is the expected result for a hidden page
   and the exact case the hook re-acquires from; it has not been seen holding.
-- **CFI** position tracking was specified for reflowable books (§5.5). The
-  implementation stores section index plus screen index instead, which survives a
-  font-size change within a section but not across one. Worth revisiting when
-  bookmarks land.
+- **CFI** position tracking was specified for reflowable books (§5.5), and
+  **bookmarks now solve the problem it was meant to solve**, by a cheaper route. A
+  reflowable bookmark stores the *element* at the top of the screen — its index
+  among the body's children — rather than a screen number, because a screen number
+  is a function of the current type size: "section 3, screen 5" is a different
+  place the moment someone presses Bigger. Re-finding the element and asking which
+  screen it now falls on survives changes of size, typeface and line spacing.
+  Verified: a bookmark set at screen 2 of 2 still resolved to the right place after
+  the type grew and the section repaginated to 3 screens.
+
+  Column pagination can only show whole screens, so a jump lands on the screen
+  *containing* the bookmark, which may leave it part-way down rather than at the
+  top. That is the ceiling of the technique, not a defect.
+
+  **Resume position has not adopted this yet** and still stores a screen index, so
+  it can still drift across a type-size change. The machinery now exists; adopting
+  it is a small, separate change.
 
 ---
 

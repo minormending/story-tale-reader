@@ -10,6 +10,8 @@ import { usePageKeys } from './usePageKeys'
 import { usePageGestures } from './usePageGestures'
 import { useWakeLock } from './useWakeLock'
 import { LockButton } from './LockButton'
+import { BookmarkToggle, BookmarksSection } from './Bookmarks'
+import { addBookmark, listBookmarks, removeBookmark, type Bookmark } from '../store/bookmarks'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { InlinePageResolver } from '../vfs/inline'
 import { isVfsReady } from '../vfs/client'
@@ -194,7 +196,37 @@ export function Viewer({
     [attachPageKeys, gestures, readAlong],
   )
 
+  /* ------------------------------ bookmarks ------------------------------ */
+
+  const [bookmarks, setBookmarks] = useState<Bookmark[]>([])
+  useEffect(() => {
+    void listBookmarks(bookId).then(setBookmarks)
+  }, [bookId])
+
   const label = describePosition(spread, book.direction)
+  const here = leadPage(spread, book.direction)
+  // A fixed-layout bookmark is a spine index: nothing the reader changes moves it.
+  const bookmarkHere = bookmarks.find((bookmark) => bookmark.pageIndex === here?.index)
+
+  const toggleBookmark = useCallback(async () => {
+    if (bookmarkHere) await removeBookmark(bookmarkHere.id)
+    else if (here) {
+      await addBookmark({
+        bookId,
+        pageIndex: here.index,
+        label: label || `Page ${here.index + 1}`,
+      })
+    }
+    setBookmarks(await listBookmarks(bookId))
+  }, [bookmarkHere, here, bookId, label])
+
+  const removeAt = useCallback(
+    async (bookmark: Bookmark) => {
+      await removeBookmark(bookmark.id)
+      setBookmarks(await listBookmarks(bookId))
+    },
+    [bookId],
+  )
   const shift = overrides.spreadShift ?? 0
 
   return (
@@ -252,13 +284,19 @@ export function Viewer({
         </div>
         <div className="chrome-actions">
           {!locked && (
-            <button
-              className="icon-button"
-              onClick={() => setMenuOpen((open) => !open)}
-              aria-expanded={menuOpen}
-            >
-              Fix layout
-            </button>
+            <>
+              <BookmarkToggle
+                bookmarked={bookmarkHere !== undefined}
+                onToggle={() => void toggleBookmark()}
+              />
+              <button
+                className="icon-button"
+                onClick={() => setMenuOpen((open) => !open)}
+                aria-expanded={menuOpen}
+              >
+                Fix layout
+              </button>
+            </>
           )}
           <LockButton
             locked={locked}
@@ -272,7 +310,15 @@ export function Viewer({
       </header>
 
       {menuOpen && (
-        <div className="menu" role="group" aria-label="Fix layout">
+        <div className="menu" role="group" aria-label="Reading options">
+          <BookmarksSection
+            bookmarks={bookmarks}
+            onJump={(bookmark) => {
+              setPageIndex(bookmark.pageIndex)
+              setMenuOpen(false)
+            }}
+            onRemove={(bookmark) => void removeAt(bookmark)}
+          />
           <p className="menu-note">
             {book.layout === 'pre-paginated' ? 'Fixed layout' : 'Reflowable'}
             {book.layoutInferred ? ' (detected)' : ''} · pairing from{' '}

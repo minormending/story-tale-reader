@@ -10,6 +10,7 @@ import { primaryImageHref } from '../engine/layout/viewport'
 import type { BookFormat, LayoutMode, LayoutOverrides, ParsedBook } from '../engine/types'
 import { STORE_BOOKS, STORE_OVERRIDES, STORE_PROGRESS, get, getAll, put, remove } from './idb'
 import { deleteBookFile, loadBookFile, requestPersistence, saveBookFile } from './files'
+import { removeBookmarksFor } from './bookmarks'
 
 export interface LibraryEntry {
   id: string
@@ -167,6 +168,7 @@ export async function deleteBook(id: string): Promise<void> {
     remove(STORE_BOOKS, id),
     remove(STORE_PROGRESS, id),
     remove(STORE_OVERRIDES, id),
+    removeBookmarksFor(id),
     deleteBookFile(id),
   ])
 }
