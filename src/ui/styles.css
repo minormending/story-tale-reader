@@ -133,7 +133,17 @@ button { font: inherit; cursor: pointer; }
   font-size: 0.9rem;
   text-align: center;
 }
-.chrome-title strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 50vw; }
+.chrome-title h1 {
+  /* A real heading, so a screen reader landing on the reader is told what it is
+     reading; sized to the chrome rather than to its level. */
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 50vw;
+}
 .chrome-title span { font-size: 0.8rem; }
 
 .icon-button {

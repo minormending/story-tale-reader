@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { bookFileUrl } from '../vfs/protocol'
 import type { BookPage } from '../engine/types'
 
@@ -19,12 +19,31 @@ export function PageFrame({
   page,
   scale,
   onReady,
+  resolveInline,
 }: {
   bookId: string
   page: BookPage
   scale: number
   onReady?: (doc: Document, page: BookPage) => void
+  /**
+   * Set when the service worker is unavailable: returns a self-contained document
+   * for this page, which is handed to the iframe through srcdoc (SPEC.md §9.3).
+   */
+  resolveInline?: (path: string) => Promise<string>
 }) {
+  const [inlineHtml, setInlineHtml] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!resolveInline) return
+    let cancelled = false
+    void resolveInline(page.path).then((html) => {
+      if (!cancelled) setInlineHtml(html)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [resolveInline, page.path])
+
   const handleLoad = useCallback(
     (event: React.SyntheticEvent<HTMLIFrameElement>) => {
       const doc = event.currentTarget.contentDocument
@@ -35,11 +54,15 @@ export function PageFrame({
     [onReady, page],
   )
 
+  if (resolveInline && inlineHtml === null) return null
+
   return (
     <iframe
       className="page-frame"
       title={`Page ${page.printedPage ?? page.index + 1}`}
-      src={bookFileUrl(bookId, page.path)}
+      {...(resolveInline
+        ? { srcDoc: inlineHtml ?? '' }
+        : { src: bookFileUrl(bookId, page.path) })}
       sandbox="allow-same-origin"
       scrolling="no"
       // Out of the tab order: a Tab press landing inside a page would take key
@@ -69,8 +92,12 @@ function injectViewerStyles(doc: Document): void {
   style.id = VIEWER_STYLE_ID
   style.textContent = `
     html, body { overflow: hidden !important; }
+    /* Let the reader swipe across the artwork: without this the browser may claim
+       the gesture as a scroll or double-tap zoom before the page turn is seen. */
+    html { touch-action: manipulation; }
     * { -webkit-tap-highlight-color: transparent; }
-    body { -webkit-touch-callout: none; }
+    img, image, svg { -webkit-user-drag: none; user-select: none; }
+    body { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
   `
   ;(doc.head ?? doc.documentElement).appendChild(style)
 }

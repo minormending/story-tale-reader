@@ -35,6 +35,8 @@ export interface Progress {
 }
 
 export interface OpenedBook {
+  /** False when the book opened but could not be kept on the shelf. */
+  persisted?: boolean
   entry: LibraryEntry
   book: ParsedBook
   /** Present for EPUBs — the source for the virtual filesystem and read-along. */
@@ -96,7 +98,10 @@ export async function importBook(file: File): Promise<OpenedBook> {
   // Parse before storing: a book we cannot open should not enter the library.
   const opened = await parse(file, file.name)
 
-  await saveBookFile(id, file)
+  // Storing is best effort from here on. The book is parsed and in memory, so a
+  // full or restricted quota should cost the reader their shelf entry, not their
+  // ability to read the book they just opened.
+  const stored = await saveBookFile(id, file)
   void requestPersistence()
 
   const entry: LibraryEntry = {
@@ -113,8 +118,26 @@ export async function importBook(file: File): Promise<OpenedBook> {
     hasMediaOverlays: opened.book.hasMediaOverlays,
     cover: existing?.cover ?? (await makeCover(opened)),
   }
-  await put(STORE_BOOKS, entry)
-  return { entry, ...opened }
+  const listed = await saveEntry(entry)
+  return { entry, ...opened, persisted: stored && listed }
+}
+
+/**
+ * Write the shelf record, dropping the cover if that is what the store refuses.
+ * A cover is the largest thing in the record and the only optional one.
+ */
+async function saveEntry(entry: LibraryEntry): Promise<boolean> {
+  try {
+    await put(STORE_BOOKS, entry)
+    return true
+  } catch {
+    try {
+      await put(STORE_BOOKS, { ...entry, cover: undefined })
+      return true
+    } catch {
+      return false
+    }
+  }
 }
 
 export async function openStoredBook(id: string): Promise<OpenedBook> {
@@ -122,12 +145,21 @@ export async function openStoredBook(id: string): Promise<OpenedBook> {
   if (!entry) throw new Error('That book is no longer in the library')
 
   const blob = await loadBookFile(id)
-  if (!blob) throw new Error('The book file is missing from storage. Import it again.')
+  if (!blob) {
+    // The record outlived its file — the browser evicted it under storage
+    // pressure, or it was cleared. Leaving the row on the shelf gives a book that
+    // can never open, so take it off and say so.
+    await deleteBook(id)
+    throw new Error(
+      `\u201c${entry.title}\u201d is no longer stored on this device, so it has been ` +
+        'removed from your shelf. Add the file again to read it.',
+    )
+  }
 
   const opened = await parse(blob, entry.fileName)
   const touched: LibraryEntry = { ...entry, lastOpenedAt: Date.now() }
-  await put(STORE_BOOKS, touched)
-  return { entry: touched, ...opened }
+  await saveEntry(touched)
+  return { entry: touched, ...opened, persisted: true }
 }
 
 export async function deleteBook(id: string): Promise<void> {

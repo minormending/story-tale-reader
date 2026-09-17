@@ -7,7 +7,10 @@ import { PageFrame } from './PageFrame'
 import { PdfPage } from './PdfPage'
 import { useReadAlong, type ReadAlongSettings } from './useReadAlong'
 import { usePageKeys } from './usePageKeys'
+import { usePageGestures } from './usePageGestures'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
+import { InlinePageResolver } from '../vfs/inline'
+import { isVfsReady } from '../vfs/client'
 import type { ZipArchive } from '../engine/zip/reader'
 import type { BookPage, Direction, LayoutOverrides, ParsedBook, Spread } from '../engine/types'
 
@@ -26,7 +29,6 @@ export interface ViewerProps {
   onClose: () => void
 }
 
-const SWIPE_THRESHOLD_PX = 40
 
 export function Viewer({
   bookId,
@@ -46,6 +48,18 @@ export function Viewer({
   const modal = useMemo(
     () => modalViewport(book.pages.map((page) => page.viewport)) ?? DEFAULT_VIEWPORT,
     [book],
+  )
+
+  // Without a service worker the pages cannot be fetched over HTTP, so each one is
+  // inlined and handed to its iframe directly.
+  const inline = useMemo(
+    () => (archive && !isVfsReady() ? new InlinePageResolver(archive) : undefined),
+    [archive],
+  )
+  useEffect(() => () => inline?.dispose(), [inline])
+  const resolveInline = useMemo(
+    () => (inline ? (path: string) => inline.page(path) : undefined),
+    [inline],
   )
 
   const paired = shouldPair(book.spread, frame, overrides.spreadMode ?? 'auto')
@@ -96,6 +110,12 @@ export function Viewer({
   // In a right-to-left book the "next" page is to the left.
   const forward = book.direction === 'rtl' ? -1 : 1
 
+  const gestures = usePageGestures({
+    onTurn: (direction) => turn(direction * forward),
+    onToggleChrome: () => setChromeVisible((visible) => !visible),
+  })
+
+
   const [readAlongSettings, setReadAlongSettings] = useState<ReadAlongSettings>({
     rate: 1,
     autoAdvance: true,
@@ -128,52 +148,31 @@ export function Viewer({
     return () => window.removeEventListener('keydown', onKey)
   }, [onKey])
 
+  useEffect(() => {
+    const previous = document.title
+    document.title = `${book.metadata.title} \u2014 Story Tale Reader`
+    return () => {
+      document.title = previous
+    }
+  }, [book.metadata.title])
+
   const attachPageKeys = usePageKeys(onKey)
 
   const handlePageReady = useCallback(
     (doc: Document, page: BookPage) => {
       attachPageKeys(doc)
+      gestures.attachToPage(doc)
       readAlong.onPageReady(doc, page)
     },
-    [attachPageKeys, readAlong],
+    [attachPageKeys, gestures, readAlong],
   )
-
-  const pointerStart = useRef<{ x: number; y: number } | null>(null)
-  const onPointerDown = (event: React.PointerEvent): void => {
-    pointerStart.current = { x: event.clientX, y: event.clientY }
-  }
-  const onPointerUp = (event: React.PointerEvent): void => {
-    const start = pointerStart.current
-    pointerStart.current = null
-    if (!start) return
-
-    const dx = event.clientX - start.x
-    const dy = event.clientY - start.y
-    if (Math.abs(dx) > SWIPE_THRESHOLD_PX && Math.abs(dx) > Math.abs(dy)) {
-      turn(dx < 0 ? forward : -forward)
-      return
-    }
-    if (Math.abs(dx) > 10 || Math.abs(dy) > 10) return
-
-    // A tap: edges turn the page, the middle shows the controls.
-    const bounds = event.currentTarget.getBoundingClientRect()
-    const position = (event.clientX - bounds.left) / bounds.width
-    if (position < 0.3) turn(-forward)
-    else if (position > 0.7) turn(forward)
-    else setChromeVisible((visible) => !visible)
-  }
 
   const label = describePosition(spread, book.direction)
   const shift = overrides.spreadShift ?? 0
 
   return (
     <div className="viewer">
-      <main
-        className="stage"
-        ref={stageRef}
-        onPointerDown={onPointerDown}
-        onPointerUp={onPointerUp}
-      >
+      <main className="stage" ref={stageRef} {...gestures.stageProps}>
         {spread && (
           <SpreadView
             spread={spread}
@@ -188,6 +187,7 @@ export function Viewer({
                   page={page}
                   scale={scale}
                   onReady={handlePageReady}
+                  resolveInline={resolveInline}
                 />
               )
             }
@@ -207,7 +207,7 @@ export function Viewer({
           ‹ Library
         </button>
         <div className="chrome-title">
-          <strong>{book.metadata.title}</strong>
+          <h1>{book.metadata.title}</h1>
           <span className="muted">{label}</span>
         </div>
         <button

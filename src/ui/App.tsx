@@ -3,7 +3,7 @@ import { Library } from './Library'
 import { Viewer } from './Viewer'
 import { ReflowableViewer } from './ReflowableViewer'
 import { DrmError } from '../engine/epub/ocf'
-import { mountBook, setReading, startVfs, unmountBook, type VfsStatus } from '../vfs/client'
+import { mountBook, setReading, startVfs, unmountBook } from '../vfs/client'
 import { onBookOpened, takeIncomingBook } from '../native/bookIntent'
 import {
   deleteBook, getOverrides, getProgress, importBook, listLibrary, openStoredBook,
@@ -24,15 +24,16 @@ interface Session {
 }
 
 export function App() {
-  const [vfs, setVfs] = useState<VfsStatus | 'starting'>('starting')
   const [entries, setEntries] = useState<LibraryEntry[]>([])
   const [session, setSession] = useState<Session | null>(null)
   const [overrides, setOverrides] = useState<LayoutOverrides>({})
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
 
   useEffect(() => {
-    void startVfs().then(setVfs)
+    // Best effort: without it, pages are inlined instead of served (SPEC.md §9.3).
+    void startVfs()
     void listLibrary().then(setEntries)
   }, [])
 
@@ -43,6 +44,11 @@ export function App() {
 
   const enter = useCallback(async (opened: OpenedBook) => {
     const { entry, book, archive } = opened
+    setNotice(
+      opened.persisted === false
+        ? 'This book is open, but there wasn\u2019t room to keep it on your shelf. Free up some space and add it again.'
+        : null,
+    )
     // Only EPUBs are served through the virtual filesystem; a PDF is held in memory
     // by pdf.js and a MOBI is unpacked into a synthetic container.
     if (archive) mountBook(entry.id, archive)
@@ -148,6 +154,7 @@ export function App() {
         <ReflowableViewer
           bookId={session.bookId}
           book={session.book}
+          archive={session.archive}
           initialPageIndex={session.initialPageIndex}
           initialScreen={session.initialScreen}
           onPositionChange={(pageIndex, screen) =>
@@ -180,11 +187,7 @@ export function App() {
       onDelete={(id) => void remove(id)}
       busy={busy}
       error={error}
-      vfsWarning={
-        vfs === 'unsupported' || vfs === 'failed'
-          ? 'This browser blocked the service worker, so fixed-layout books can’t be displayed. Try a normal (non-private) window.'
-          : null
-      }
+      notice={notice}
     />
   )
 }

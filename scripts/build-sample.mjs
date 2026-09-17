@@ -97,16 +97,31 @@ function typeScale(characters) {
   return { size: 20, leading: 29 }
 }
 
-async function composePage(imageBytes) {
+/**
+ * Compose one page.
+ *
+ * A page carrying text keeps its illustration in the upper band so the words have
+ * somewhere to sit. A page without text — the cover, the frontispiece — gets the
+ * whole page and is centred, because anchoring it to the top left a large empty
+ * expanse of cream underneath.
+ */
+async function composePage(imageBytes, { hasText }) {
+  const maxWidth = hasText ? ART_MAX_W : W - 110
+  const maxHeight = hasText ? ART_MAX_H : H - 150
+
   const art = sharp(Buffer.from(imageBytes))
   const meta = await art.metadata()
-  const scale = Math.min(ART_MAX_W / meta.width, ART_MAX_H / meta.height, 1.6)
+  const scale = Math.min(maxWidth / meta.width, maxHeight / meta.height, 1.6)
   const width = Math.round(meta.width * scale)
   const height = Math.round(meta.height * scale)
 
   const resized = await art.resize(width, height).toBuffer()
   return sharp({ create: { width: W, height: H, channels: 3, background: PAPER } })
-    .composite([{ input: resized, left: Math.round((W - width) / 2), top: ART_TOP }])
+    .composite([{
+      input: resized,
+      left: Math.round((W - width) / 2),
+      top: hasText ? ART_TOP : Math.round((H - height) / 2),
+    }])
     .jpeg({ quality: 82, progressive: true })
     .toBuffer()
 }
@@ -146,7 +161,7 @@ const pages = []
 
 // --- cover ---
 const coverKey = Object.keys(files).find((path) => /cover\.jpg$/.test(path))
-out['OEBPS/images/cover.jpg'] = new Uint8Array(await composePage(files[coverKey]))
+out['OEBPS/images/cover.jpg'] = new Uint8Array(await composePage(files[coverKey], { hasText: false }))
 pages.push({ id: 'cover', file: 'cover.xhtml', image: 'cover.jpg', paragraphs: [], kind: 'cover' })
 
 // --- title page ---
@@ -160,7 +175,9 @@ pages.push({ id: 'title', file: 'title.xhtml', image: 'title.jpg', paragraphs: [
 // --- story ---
 for (const [index, page] of source.entries()) {
   const n = String(index + 1).padStart(2, '0')
-  out[`OEBPS/images/p${n}.jpg`] = new Uint8Array(await composePage(files[`OEBPS/${page.image}`]))
+  out[`OEBPS/images/p${n}.jpg`] = new Uint8Array(
+    await composePage(files[`OEBPS/${page.image}`], { hasText: page.paragraphs.length > 0 }),
+  )
   pages.push({ id: `p${n}`, file: `p${n}.xhtml`, image: `p${n}.jpg`, paragraphs: page.paragraphs, kind: 'story' })
 }
 

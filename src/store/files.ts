@@ -18,7 +18,12 @@ async function booksDirectory(): Promise<FileSystemDirectoryHandle> {
   return root.getDirectoryHandle('books', { create: true })
 }
 
-export async function saveBookFile(id: string, blob: Blob): Promise<void> {
+/**
+ * Store a book's bytes. Returns false rather than throwing when neither backing
+ * store will take it — a full or restricted quota must not stop someone reading a
+ * book that is already open.
+ */
+export async function saveBookFile(id: string, blob: Blob): Promise<boolean> {
   if (opfsAvailable()) {
     try {
       const dir = await booksDirectory()
@@ -26,12 +31,17 @@ export async function saveBookFile(id: string, blob: Blob): Promise<void> {
       const writable = await handle.createWritable()
       await writable.write(blob)
       await writable.close()
-      return
+      return true
     } catch {
       // Fall through to IndexedDB.
     }
   }
-  await put(STORE_BLOBS, { id, blob })
+  try {
+    await put(STORE_BLOBS, { id, blob })
+    return true
+  } catch {
+    return false
+  }
 }
 
 export async function loadBookFile(id: string): Promise<Blob | undefined> {

@@ -21,7 +21,7 @@ export function Library({
   onDelete,
   busy,
   error,
-  vfsWarning,
+  notice,
 }: {
   entries: LibraryEntry[]
   onOpenFile: (file: File) => void
@@ -29,7 +29,7 @@ export function Library({
   onDelete: (id: string) => void
   busy: string | null
   error: string | null
-  vfsWarning: string | null
+  notice: string | null
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
@@ -77,8 +77,8 @@ export function Library({
         />
       </header>
 
-      {vfsWarning && <p className="banner banner-warn">{vfsWarning}</p>}
       {error && <p className="banner banner-error">{error}</p>}
+      {notice && <p className="banner banner-warn">{notice}</p>}
       {busy && <p className="banner banner-busy">{busy}</p>}
 
       <main className="library-main">
@@ -172,7 +172,7 @@ function StorageLine() {
       setText(`${used.toFixed(0)} MB used of about ${quota.toFixed(1)} GB available`)
     })
   }, [])
-  return text ? <p className="muted">{text}</p> : null
+  return text ? <p className="muted storage-line">{text}</p> : null
 }
 
 /**
@@ -184,6 +184,8 @@ function DevCorpus({ onOpenFile }: { onOpenFile: (file: File) => void }) {
   const [books, setBooks] = useState<CorpusBook[]>([])
 
   useEffect(() => {
+    // Only when the dev-corpus plugin is serving — see scripts/dev-corpus.ts.
+    if (!(window as { __STORY_TALE_CORPUS__?: boolean }).__STORY_TALE_CORPUS__) return
     void fetch('/corpus/index.json')
       .then((response) => (response.ok ? response.json() : []))
       .then(setBooks)

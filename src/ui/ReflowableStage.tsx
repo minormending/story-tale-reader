@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { bookFileUrl } from '../vfs/protocol'
 import { reflowableStyles, screenCount, type Typography } from '../reader/typography'
 import type { BookPage } from '../engine/types'
@@ -21,6 +21,7 @@ export function ReflowableStage({
   screen,
   onMeasured,
   onDocumentReady,
+  resolveInline,
 }: {
   bookId: string
   page: BookPage
@@ -31,8 +32,22 @@ export function ReflowableStage({
   onMeasured: (count: number) => void
   /** Called with the page document so keyboard handling can be attached to it. */
   onDocumentReady?: (doc: Document) => void
+  /** Service-worker fallback: a self-contained document for this section. */
+  resolveInline?: (path: string) => Promise<string>
 }) {
   const frameRef = useRef<HTMLIFrameElement>(null)
+  const [inlineHtml, setInlineHtml] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!resolveInline) return
+    let cancelled = false
+    void resolveInline(page.path).then((html) => {
+      if (!cancelled) setInlineHtml(html)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [resolveInline, page.path])
 
   const layout = useCallback(() => {
     const doc = frameRef.current?.contentDocument
@@ -70,7 +85,9 @@ export function ReflowableStage({
         ref={frameRef}
         className="reflow-frame"
         title={page.printedPage ? `Page ${page.printedPage}` : `Section ${page.index + 1}`}
-        src={bookFileUrl(bookId, page.path)}
+        {...(resolveInline
+          ? { srcDoc: inlineHtml ?? '' }
+          : { src: bookFileUrl(bookId, page.path) })}
         sandbox="allow-same-origin"
         scrolling="no"
         tabIndex={-1}

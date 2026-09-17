@@ -32,8 +32,21 @@ export function devCorpus(): Plugin {
     createReadStream(file).pipe(res)
   }
 
+  // A flag in the served HTML, so the app only probes for the corpus when this
+  // plugin is actually serving. Without it the production bundle fetched
+  // /corpus/index.json on every load and 404ed for every real user.
+  const marker = '<script>window.__STORY_TALE_CORPUS__ = true</script>'
+
   return {
     name: 'story-tale-dev-corpus',
+    // `transformIndexHtml` also runs during `vite build`, which would bake the flag
+    // into production and make every real user's browser fetch a corpus that isn't
+    // there. Inject it only when a dev server is actually serving, or when a preview
+    // build explicitly opts in.
+    transformIndexHtml(html: string, ctx: { server?: unknown }) {
+      const serving = ctx.server !== undefined || process.env.CORPUS_PREVIEW === 'true'
+      return serving ? html.replace('</head>', `  ${marker}\n  </head>`) : html
+    },
     configureServer(server) {
       server.middlewares.use('/corpus', middleware)
     },

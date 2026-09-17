@@ -15,7 +15,8 @@
     "android:sync": "npm run build && npx cap sync android",
     "android:open": "npx cap open android",
     "fixtures": "node scripts/build-fixtures.mjs && node scripts/make-pdf-fixture.mjs && node scripts/make-mobi-fixture.mjs",
-    "sample": "node scripts/build-sample.mjs"
+    "sample": "node scripts/build-sample.mjs",
+    "preview:corpus": "CORPUS_PREVIEW=true vite build && vite preview"
   },
   "dependencies": {
     "@capacitor/app": "^8.1.1",

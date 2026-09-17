@@ -2,25 +2,30 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ReflowableStage } from './ReflowableStage'
 import { useFrameSize } from './useFrameSize'
 import { usePageKeys } from './usePageKeys'
+import { usePageGestures } from './usePageGestures'
 import { DEFAULT_TYPOGRAPHY, type ReaderFont, type ReaderTheme, type Typography } from '../reader/typography'
+import { InlinePageResolver } from '../vfs/inline'
+import { isVfsReady } from '../vfs/client'
+import type { ZipArchive } from '../engine/zip/reader'
 import type { ParsedBook } from '../engine/types'
 
 export interface ReflowableViewerProps {
   bookId: string
   book: ParsedBook
+  archive: ZipArchive | undefined
   initialPageIndex: number
   initialScreen: number
   onPositionChange: (pageIndex: number, screen: number) => void
   onClose: () => void
 }
 
-const SWIPE_THRESHOLD_PX = 40
 /** Sentinel for "put me on the last screen of the section I just stepped back into". */
 const LAST_SCREEN = -1
 
 export function ReflowableViewer({
   bookId,
   book,
+  archive,
   initialPageIndex,
   initialScreen,
   onPositionChange,
@@ -30,6 +35,16 @@ export function ReflowableViewer({
   const [chromeVisible, setChromeVisible] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
   const [typography, setTypography] = useState<Typography>(DEFAULT_TYPOGRAPHY)
+
+  const inline = useMemo(
+    () => (archive && !isVfsReady() ? new InlinePageResolver(archive) : undefined),
+    [archive],
+  )
+  useEffect(() => () => inline?.dispose(), [inline])
+  const resolveInline = useMemo(
+    () => (inline ? (path: string) => inline.page(path) : undefined),
+    [inline],
+  )
 
   const sections = useMemo(() => book.pages.filter((page) => page.linear), [book.pages])
   const [sectionIndex, setSectionIndex] = useState(() =>
@@ -91,42 +106,35 @@ export function ReflowableViewer({
     return () => window.removeEventListener('keydown', onKey)
   }, [onKey])
 
+  useEffect(() => {
+    const previous = document.title
+    document.title = `${book.metadata.title} \u2014 Story Tale Reader`
+    return () => {
+      document.title = previous
+    }
+  }, [book.metadata.title])
+
   const attachPageKeys = usePageKeys(onKey)
 
-  const pointerStart = useRef<{ x: number; y: number } | null>(null)
-  const onPointerUp = (event: React.PointerEvent): void => {
-    const start = pointerStart.current
-    pointerStart.current = null
-    if (!start) return
+  const gestures = usePageGestures({
+    onTurn: (direction) => turn(direction * forward),
+    onToggleChrome: () => setChromeVisible((visible) => !visible),
+  })
 
-    const dx = event.clientX - start.x
-    const dy = event.clientY - start.y
-    if (Math.abs(dx) > SWIPE_THRESHOLD_PX && Math.abs(dx) > Math.abs(dy)) {
-      turn(dx < 0 ? forward : -forward)
-      return
-    }
-    if (Math.abs(dx) > 10 || Math.abs(dy) > 10) return
-
-    const bounds = event.currentTarget.getBoundingClientRect()
-    const position = (event.clientX - bounds.left) / bounds.width
-    if (position < 0.3) turn(-forward)
-    else if (position > 0.7) turn(forward)
-    else setChromeVisible((visible) => !visible)
-  }
+  const onPageDocument = useCallback(
+    (doc: Document) => {
+      attachPageKeys(doc)
+      gestures.attachToPage(doc)
+    },
+    [attachPageKeys, gestures],
+  )
 
   const set = <K extends keyof Typography>(key: K, value: Typography[K]): void =>
     setTypography((current) => ({ ...current, [key]: value }))
 
   return (
     <div className="viewer viewer-reflow">
-      <main
-        className="stage"
-        ref={stageRef}
-        onPointerDown={(event) => {
-          pointerStart.current = { x: event.clientX, y: event.clientY }
-        }}
-        onPointerUp={onPointerUp}
-      >
+      <main className="stage" ref={stageRef} {...gestures.stageProps}>
         {section && frame.width > 0 && (
           <ReflowableStage
             key={section.index}
@@ -136,7 +144,8 @@ export function ReflowableViewer({
             typography={typography}
             screen={Math.max(screen, 0)}
             onMeasured={onMeasured}
-            onDocumentReady={attachPageKeys}
+            onDocumentReady={onPageDocument}
+            resolveInline={resolveInline}
           />
         )}
       </main>
@@ -146,7 +155,7 @@ export function ReflowableViewer({
           ‹ Library
         </button>
         <div className="chrome-title">
-          <strong>{book.metadata.title}</strong>
+          <h1>{book.metadata.title}</h1>
           <span className="muted">
             Section {sectionIndex + 1} of {sections.length}
           </span>

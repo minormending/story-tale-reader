@@ -35,13 +35,20 @@ export function setReading(value: boolean): void {
 
 export type VfsStatus = 'ready' | 'unsupported' | 'failed'
 
+let status: VfsStatus | 'starting' = 'starting'
+
+/** Whether book files can be served over HTTP, or the inline fallback is needed. */
+export function isVfsReady(): boolean {
+  return status === 'ready'
+}
+
 /**
  * Registering is best-effort: without a service worker the app still runs, but
  * fixed-layout rendering and read-along are unavailable (SPEC.md §9.3).
  */
 export async function startVfs(): Promise<VfsStatus> {
   listen()
-  if (!('serviceWorker' in navigator)) return 'unsupported'
+  if (!('serviceWorker' in navigator)) return (status = 'unsupported')
 
   // A page that is already controlled loaded its assets from the old worker's
   // precache, so when a newer worker takes over the page is showing stale code.
@@ -67,9 +74,9 @@ export async function startVfs(): Promise<VfsStatus> {
         setTimeout(done, 3000)
       })
     }
-    return navigator.serviceWorker.controller ? 'ready' : 'failed'
+    return (status = navigator.serviceWorker.controller ? 'ready' : 'failed')
   } catch {
-    return 'failed'
+    return (status = 'failed')
   }
 }
 
