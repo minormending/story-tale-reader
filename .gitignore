@@ -1,0 +1,24 @@
+node_modules/
+dist/
+dist-ssr/
+*.local
+.DS_Store
+.vite/
+coverage/
+test-results/
+playwright-report/
+.env
+.env.*
+!.env.example
+
+# Real, in-copyright books used for development. Never commit these. See SPEC.md §12.
+corpus/local/
+
+# Android build output & signing material
+android/app/build/
+android/build/
+android/.gradle/
+android/local.properties
+android/app/release/
+*.keystore
+*.jks
