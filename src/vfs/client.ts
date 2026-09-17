@@ -9,6 +9,9 @@ import type { BookFetchRequest, BookFetchResponse } from './protocol'
 
 const archives = new Map<string, ZipArchive>()
 let listening = false
+let reloadArmed = false
+let reloadPending = false
+let readingBook = false
 
 export function mountBook(bookId: string, archive: ZipArchive): void {
   archives.set(bookId, archive)
@@ -16,6 +19,18 @@ export function mountBook(bookId: string, archive: ZipArchive): void {
 
 export function unmountBook(bookId: string): void {
   archives.delete(bookId)
+}
+
+/**
+ * Hold off an update reload while a book is open.
+ *
+ * A new deployment replaces the service worker, and the page has to reload to pick
+ * up the new assets — but doing that mid-story would drop a child out of the book
+ * they are reading. The reload waits until they are back at the library instead.
+ */
+export function setReading(value: boolean): void {
+  readingBook = value
+  if (!value && reloadPending) window.location.reload()
 }
 
 export type VfsStatus = 'ready' | 'unsupported' | 'failed'
@@ -27,6 +42,11 @@ export type VfsStatus = 'ready' | 'unsupported' | 'failed'
 export async function startVfs(): Promise<VfsStatus> {
   listen()
   if (!('serviceWorker' in navigator)) return 'unsupported'
+
+  // A page that is already controlled loaded its assets from the old worker's
+  // precache, so when a newer worker takes over the page is showing stale code.
+  const hadController = !!navigator.serviceWorker.controller
+  if (hadController) armUpdateReload()
 
   try {
     const base = import.meta.env.BASE_URL || '/'
@@ -51,6 +71,18 @@ export async function startVfs(): Promise<VfsStatus> {
   } catch {
     return 'failed'
   }
+}
+
+function armUpdateReload(): void {
+  if (reloadArmed) return
+  reloadArmed = true
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (readingBook) {
+      reloadPending = true
+      return
+    }
+    window.location.reload()
+  })
 }
 
 function listen(): void {

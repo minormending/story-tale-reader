@@ -3,7 +3,7 @@ import { Library } from './Library'
 import { Viewer } from './Viewer'
 import { ReflowableViewer } from './ReflowableViewer'
 import { DrmError } from '../engine/epub/ocf'
-import { mountBook, startVfs, unmountBook, type VfsStatus } from '../vfs/client'
+import { mountBook, setReading, startVfs, unmountBook, type VfsStatus } from '../vfs/client'
 import { onBookOpened, takeIncomingBook } from '../native/bookIntent'
 import {
   deleteBook, getOverrides, getProgress, importBook, listLibrary, openStoredBook,
@@ -35,6 +35,11 @@ export function App() {
     void startVfs().then(setVfs)
     void listLibrary().then(setEntries)
   }, [])
+
+  // Defer any service-worker update reload until the reader leaves the book.
+  useEffect(() => {
+    setReading(session !== null)
+  }, [session])
 
   const enter = useCallback(async (opened: OpenedBook) => {
     const { entry, book, archive } = opened
