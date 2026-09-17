@@ -3,11 +3,14 @@ import { SpreadView } from './SpreadView'
 import { useFrameSize } from './useFrameSize'
 import { applySpreadShift, buildSpreads, shouldPair } from '../engine/layout/spread'
 import { modalViewport, DEFAULT_VIEWPORT } from '../engine/layout/viewport'
+import { useReadAlong, type ReadAlongSettings } from './useReadAlong'
+import type { ZipArchive } from '../engine/zip/reader'
 import type { BookPage, Direction, LayoutOverrides, ParsedBook, Spread } from '../engine/types'
 
 export interface ViewerProps {
   bookId: string
   book: ParsedBook
+  archive: ZipArchive | undefined
   /** Spine index to resume from. */
   initialPageIndex: number
   overrides: LayoutOverrides
@@ -21,6 +24,7 @@ const SWIPE_THRESHOLD_PX = 40
 export function Viewer({
   bookId,
   book,
+  archive,
   initialPageIndex,
   overrides,
   onOverridesChange,
@@ -84,6 +88,20 @@ export function Viewer({
   // In a right-to-left book the "next" page is to the left.
   const forward = book.direction === 'rtl' ? -1 : 1
 
+  const [readAlongSettings, setReadAlongSettings] = useState<ReadAlongSettings>({
+    rate: 1,
+    autoAdvance: true,
+  })
+
+  const readAlong = useReadAlong({
+    book,
+    archive,
+    spread,
+    direction: book.direction,
+    settings: readAlongSettings,
+    onFinishedSpread: () => turn(forward),
+  })
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
       if (event.key === 'ArrowRight' || event.key === 'PageDown' || event.key === ' ') turn(forward)
@@ -130,11 +148,26 @@ export function Viewer({
         onPointerDown={onPointerDown}
         onPointerUp={onPointerUp}
       >
-        {spread && <SpreadView bookId={bookId} spread={spread} modal={modal} frame={frame} />}
+        {spread && (
+          <SpreadView
+            bookId={bookId}
+            spread={spread}
+            modal={modal}
+            frame={frame}
+            onPageReady={readAlong.onPageReady}
+          />
+        )}
       </div>
 
       <header className={`chrome chrome-top${chromeVisible ? '' : ' hidden'}`}>
-        <button className="icon-button" onClick={onClose} aria-label="Back to library">
+        <button
+          className="icon-button"
+          onClick={() => {
+            readAlong.stop()
+            onClose()
+          }}
+          aria-label="Back to library"
+        >
           ‹ Library
         </button>
         <div className="chrome-title">
@@ -174,6 +207,38 @@ export function Viewer({
             the wrong page.
           </p>
 
+          {book.hasMediaOverlays && (
+            <>
+              <hr className="menu-rule" />
+              <p className="menu-note">Read-along</p>
+              <div className="menu-row">
+                {([0.75, 1, 1.25] as const).map((rate) => (
+                  <button
+                    key={rate}
+                    className={`chip${readAlongSettings.rate === rate ? ' chip-on' : ''}`}
+                    onClick={() => setReadAlongSettings((current) => ({ ...current, rate }))}
+                  >
+                    {rate === 1 ? 'Normal' : `${rate}\u00d7`}
+                  </button>
+                ))}
+              </div>
+              <button
+                className="menu-item"
+                onClick={() =>
+                  setReadAlongSettings((current) => ({
+                    ...current,
+                    autoAdvance: !current.autoAdvance,
+                  }))
+                }
+              >
+                <span>Turn the page automatically</span>
+                <span className="muted">{readAlongSettings.autoAdvance ? 'on' : 'off'}</span>
+              </button>
+              <p className="menu-hint">Tap any word to hear it read from there.</p>
+              <hr className="menu-rule" />
+            </>
+          )}
+
           <div className="menu-row">
             {(['auto', 'single', 'double'] as const).map((mode) => (
               <button
@@ -192,9 +257,20 @@ export function Viewer({
         <button className="icon-button" onClick={() => turn(-forward)} disabled={spreadIndex === 0}>
           Previous
         </button>
-        <span className="muted">
-          {spreadIndex + 1} / {spreads.length}
-        </span>
+        <div className="chrome-centre">
+          {readAlong.available && (
+            <button
+              className={`play${readAlong.playing ? ' play-on' : ''}`}
+              onClick={readAlong.toggle}
+              aria-label={readAlong.playing ? 'Pause read-along' : 'Play read-along'}
+            >
+              {readAlong.playing ? '\u23f8' : '\u25b6'}
+            </button>
+          )}
+          <span className="muted">
+            {spreadIndex + 1} / {spreads.length}
+          </span>
+        </div>
         <button
           className="icon-button"
           onClick={() => turn(forward)}

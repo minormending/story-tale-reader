@@ -143,6 +143,7 @@ export async function loadEpub(source: ByteSource, overrides: LayoutOverrides = 
     nav: nav.toc,
     coverPath: pkg.coverPath,
     hasMediaOverlays: hasMediaOverlays(pkg),
+    activeClass: pkg.meta.get('media:active-class') || undefined,
     packagePath,
   }
 

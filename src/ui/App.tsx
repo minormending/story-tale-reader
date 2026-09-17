@@ -7,11 +7,13 @@ import {
   deleteBook, getOverrides, getProgress, importBook, listLibrary, openStoredBook,
   saveOverrides, saveProgress, type LibraryEntry, type OpenedBook,
 } from '../store/library'
+import type { ZipArchive } from '../engine/zip/reader'
 import type { LayoutOverrides, ParsedBook } from '../engine/types'
 
 interface Session {
   bookId: string
   book: ParsedBook
+  archive: ZipArchive
   entry: LibraryEntry
   initialPageIndex: number
 }
@@ -39,7 +41,7 @@ export function App() {
     setOverrides(storedOverrides)
     setSession((previous) => {
       if (previous && previous.bookId !== entry.id) unmountBook(previous.bookId)
-      return { bookId: entry.id, book, entry, initialPageIndex: pageIndex }
+      return { bookId: entry.id, book, archive, entry, initialPageIndex: pageIndex }
     })
     setEntries(await listLibrary())
   }, [])
@@ -105,6 +107,7 @@ export function App() {
       <Viewer
         bookId={session.bookId}
         book={session.book}
+        archive={session.archive}
         initialPageIndex={session.initialPageIndex}
         overrides={overrides}
         onOverridesChange={changeOverrides}

@@ -74,6 +74,8 @@ export interface ParsedBook {
   nav: NavItem[]
   coverPath?: string
   hasMediaOverlays: boolean
+  /** `media:active-class` — the class a book styles its spoken word with. */
+  activeClass?: string
   /** Container-absolute path of the package document, for resolving hrefs. */
   packagePath: string
 }
