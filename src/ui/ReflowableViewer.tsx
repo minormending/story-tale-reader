@@ -20,7 +20,9 @@ export interface ReflowableViewerProps {
   archive: ZipArchive | undefined
   initialPageIndex: number
   initialScreen: number
-  onPositionChange: (pageIndex: number, screen: number) => void
+  /** The element the reader left off at, when one was recorded. */
+  initialAnchor?: number
+  onPositionChange: (pageIndex: number, screen: number, anchor?: number) => void
   onClose: () => void
 }
 
@@ -33,6 +35,7 @@ export function ReflowableViewer({
   archive,
   initialPageIndex,
   initialScreen,
+  initialAnchor,
   onPositionChange,
   onClose,
 }: ReflowableViewerProps) {
@@ -65,16 +68,26 @@ export function ReflowableViewer({
 
   const notify = useRef(onPositionChange)
   notify.current = onPositionChange
-  useEffect(() => {
-    if (section) notify.current(section.index, Math.max(screen, 0))
-  }, [section, screen])
 
-  /** The page document, for measuring bookmark anchors. */
+  /** The page document, for measuring anchors. */
   const docRef = useRef<Document | null>(null)
+  /**
+   * Bumped whenever a section's document becomes available.
+   *
+   * A fresh iframe has no usable document until it loads, which happens after the
+   * effects of the render that mounted it. Anything that measures the page has to
+   * re-run at that point, or it measures the section the reader just left.
+   */
+  const [docGeneration, setDocGeneration] = useState(0)
   const frameWidthRef = useRef(0)
   frameWidthRef.current = frame.width
-  /** An anchor waiting for its section to finish laying out before it can resolve. */
-  const pendingAnchor = useRef<number | undefined>(undefined)
+  /**
+   * An anchor waiting for its section to finish laying out before it can resolve.
+   * Seeded with the resumed position, so reopening a book lands on the text the
+   * reader left off at rather than on a screen number that the current type size
+   * may have moved.
+   */
+  const pendingAnchor = useRef<number | undefined>(initialAnchor)
 
   const onMeasured = useCallback((count: number) => {
     setScreenCount(count)
@@ -153,11 +166,28 @@ export function ReflowableViewer({
   const onPageDocument = useCallback(
     (doc: Document) => {
       docRef.current = doc
+      setDocGeneration((generation) => generation + 1)
       attachPageKeys(doc)
       gestures.attachToPage(doc)
     },
     [attachPageKeys, gestures],
   )
+
+  // Drop the previous section's document the moment the section changes, so the
+  // gap before the new one loads reports no anchor rather than a wrong one — an
+  // index measured against different content would resolve to the wrong screen.
+  useEffect(() => {
+    docRef.current = null
+  }, [sectionIndex])
+
+  useEffect(() => {
+    if (!section) return
+    // Child effects commit before parent ones, so the stage has already applied the
+    // transform for this screen and the anchor read below reflects it.
+    const doc = docRef.current
+    const point = doc ? captureAnchor(doc, frame.width) : undefined
+    notify.current(section.index, Math.max(screen, 0), point?.index)
+  }, [section, screen, frame.width, docGeneration])
 
   /* ------------------------------ bookmarks ------------------------------ */
 
@@ -182,7 +212,7 @@ export function ReflowableViewer({
       if (bookmark.pageIndex !== section.index || bookmark.anchor === undefined) return false
       return screenForAnchor(doc, frame.width, bookmark.anchor) === Math.max(screen, 0)
     })
-  }, [bookmarks, section, frame.width, screen])
+  }, [bookmarks, section, frame.width, screen, docGeneration])
 
   const toggleBookmark = useCallback(async () => {
     if (bookmarkHere) {

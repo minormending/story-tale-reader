@@ -590,9 +590,20 @@ Visual correctness is the entire product, so the test strategy is weighted towar
   *containing* the bookmark, which may leave it part-way down rather than at the
   top. That is the ceiling of the technique, not a defect.
 
-  **Resume position has not adopted this yet** and still stores a screen index, so
-  it can still drift across a type-size change. The machinery now exists; adopting
-  it is a small, separate change.
+  **Resume position uses the same anchor**, and needed it more than bookmarks did:
+  typography is per-session, so a book reopened after being read at a larger size
+  is laid out at the default again, and the screen number recorded during that
+  session points somewhere else entirely. The screen index is still written as a
+  fallback for positions saved before the anchor existed. Verified in a case where
+  the two genuinely disagree: left at screen 2 of 3 with the type enlarged, a
+  screen number resumed at 2 of 2 — the wrong text — while the anchor resumed at
+  1 of 2, the screen actually holding that paragraph.
+
+  A section's document only exists once its iframe has loaded, which is after the
+  effects of the render that mounted it, so anything measuring the page has to
+  re-run at that point. The previous section's document is dropped the instant the
+  section changes: an index measured against different content resolves to the
+  wrong screen, and reporting no anchor is better than reporting a wrong one.
 
 ---
 

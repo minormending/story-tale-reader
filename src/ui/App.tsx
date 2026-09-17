@@ -21,6 +21,7 @@ interface Session {
   entry: LibraryEntry
   initialPageIndex: number
   initialScreen: number
+  initialAnchor?: number
 }
 
 export function App() {
@@ -67,6 +68,7 @@ export function App() {
         pdf: opened.pdf,
         initialPageIndex: position.pageIndex,
         initialScreen: position.screen,
+        initialAnchor: position.anchor,
       }
     })
     setEntries(await listLibrary())
@@ -157,8 +159,9 @@ export function App() {
           archive={session.archive}
           initialPageIndex={session.initialPageIndex}
           initialScreen={session.initialScreen}
-          onPositionChange={(pageIndex, screen) =>
-            void saveProgress(session.bookId, pageIndex, screen)
+          initialAnchor={session.initialAnchor}
+          onPositionChange={(pageIndex, screen, anchor) =>
+            void saveProgress(session.bookId, pageIndex, screen, anchor)
           }
           onClose={close}
         />

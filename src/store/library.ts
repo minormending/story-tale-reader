@@ -32,6 +32,13 @@ export interface Progress {
   pageIndex: number
   /** Screen within a reflowable section; unused for fixed-layout books. */
   screen?: number
+  /**
+   * Reflowable only: the element at the top of the screen, by its index among the
+   * body's children. Preferred over `screen` on the way back, because a screen
+   * number is a function of the current type size and drifts the moment it changes.
+   * `screen` is kept as the fallback for positions saved before this existed.
+   */
+  anchor?: number
   updatedAt: number
 }
 
@@ -175,13 +182,24 @@ export async function deleteBook(id: string): Promise<void> {
 
 /* ----------------------------- reading position ----------------------------- */
 
-export async function getProgress(id: string): Promise<{ pageIndex: number; screen: number }> {
+export async function getProgress(
+  id: string,
+): Promise<{ pageIndex: number; screen: number; anchor?: number }> {
   const stored = await get<Progress>(STORE_PROGRESS, id)
-  return { pageIndex: stored?.pageIndex ?? 0, screen: stored?.screen ?? 0 }
+  return {
+    pageIndex: stored?.pageIndex ?? 0,
+    screen: stored?.screen ?? 0,
+    anchor: stored?.anchor,
+  }
 }
 
-export async function saveProgress(id: string, pageIndex: number, screen = 0): Promise<void> {
-  await put(STORE_PROGRESS, { id, pageIndex, screen, updatedAt: Date.now() } satisfies Progress)
+export async function saveProgress(
+  id: string,
+  pageIndex: number,
+  screen = 0,
+  anchor?: number,
+): Promise<void> {
+  await put(STORE_PROGRESS, { id, pageIndex, screen, anchor, updatedAt: Date.now() } satisfies Progress)
 }
 
 /* -------------------------------- overrides -------------------------------- */
