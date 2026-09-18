@@ -106,11 +106,15 @@ export function Viewer({
     notifyPage.current(pageIndex)
   }, [pageIndex])
 
+  /** Returns whether the book actually moved — false at either end. */
   const turn = useCallback(
-    (delta: number) => {
-      const target = spreads[Math.min(Math.max(spreadIndex + delta, 0), spreads.length - 1)]
-      const first = leadPage(target, book.direction)
-      if (first) setPageIndex(first.index)
+    (delta: number): boolean => {
+      const targetIndex = Math.min(Math.max(spreadIndex + delta, 0), spreads.length - 1)
+      if (targetIndex === spreadIndex) return false
+      const first = leadPage(spreads[targetIndex], book.direction)
+      if (!first) return false
+      setPageIndex(first.index)
+      return true
     },
     [spreads, spreadIndex, book.direction],
   )

@@ -40,7 +40,8 @@ export function useReadAlong({
   spread: Spread | undefined
   direction: Direction
   settings: ReadAlongSettings
-  onFinishedSpread: () => void
+  /** Turn the page. Returns whether it moved — false at the end of the book. */
+  onFinishedSpread: () => boolean
 }): ReadAlong {
   const [playing, setPlaying] = useState(false)
   const [available, setAvailable] = useState(false)
@@ -48,6 +49,17 @@ export function useReadAlong({
 
   const finished = useRef(onFinishedSpread)
   finished.current = onFinishedSpread
+
+  /**
+   * Set when narration ran out and the page was turned for the reader, so the new
+   * spread knows to keep reading.
+   *
+   * The player is genuinely stopped by then — it reports `isPlaying` false before
+   * announcing that it finished — so the spread-change effect below could not tell
+   * an auto-turn apart from the reader turning the page themselves, and stopped. A
+   * read-along book that has to be restarted by hand on every spread is not one.
+   */
+  const keepReading = useRef(false)
 
   const autoAdvance = useRef(settings.autoAdvance)
   autoAdvance.current = settings.autoAdvance
@@ -57,7 +69,10 @@ export function useReadAlong({
     const player = new ReadAlongPlayer(archive, book, {
       onStateChange: setPlaying,
       onFinished: () => {
-        if (autoAdvance.current) finished.current()
+        // Only claim the next spread if there actually is one; otherwise the flag
+        // would survive to the reader's next page turn and start narrating
+        // somewhere they never asked for.
+        if (autoAdvance.current) keepReading.current = finished.current()
       },
     })
     playerRef.current = player
@@ -83,12 +98,13 @@ export function useReadAlong({
       return
     }
     let cancelled = false
-    const wasPlaying = player.isPlaying
+    const resume = player.isPlaying || keepReading.current
+    keepReading.current = false
     player.pause()
     void player.setPages(pages).then((hasNarration) => {
       if (cancelled) return
       setAvailable(hasNarration)
-      if (hasNarration && wasPlaying) void player.play()
+      if (hasNarration && resume) void player.play()
     })
     return () => {
       cancelled = true
@@ -104,6 +120,7 @@ export function useReadAlong({
   }, [])
 
   const stop = useCallback(() => {
+    keepReading.current = false
     playerRef.current?.pause()
   }, [])
 

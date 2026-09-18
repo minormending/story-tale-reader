@@ -178,3 +178,31 @@ describe.skipIf(!existsSync(REFERENCE_BOOK))('loadEpub against the reference boo
     expect(book.pages.filter((p) => p.overlayPath).length).toBe(27)
   })
 })
+
+const TIPPIE = 'corpus/local/tippie-and-the-cat.epub'
+describe.skipIf(!existsSync(TIPPIE))('loadEpub against an InDesign early-reader', () => {
+  it('detects it as reflowable, because the file says nothing and shows nothing', async () => {
+    const { book } = await loadEpub(bufferSource(readFileSync(TIPPIE)))
+
+    expect(book.metadata.title).toBe('Learn to Read (L1 Big Book 1)')
+    expect(book.metadata.creator).toBe('José Palmer')
+    expect(book.pages.length).toBe(25)
+
+    // No rendition:layout, no ibooks display-options, and no page declares a pixel
+    // viewport — so there is nothing to infer fixed layout from, and nothing to
+    // position text against either. SPEC.md §1.2: this is the case no reader can
+    // fix, because the information simply is not in the file.
+    expect(book.layout).toBe('reflowable')
+    expect(book.layoutInferred).toBe(false)
+    expect(book.hasMediaOverlays).toBe(false)
+  })
+
+  it('is not treated as DRM-protected, because its content is in the clear', async () => {
+    // Every document carries an Adept.expected.resource marker, left behind by
+    // Adobe's tooling, but there is no rights.xml or encryption.xml — so nothing
+    // is actually encrypted and refusing it would be wrong.
+    const { archive } = await loadEpub(bufferSource(readFileSync(TIPPIE)))
+    expect(archive.has('META-INF/rights.xml')).toBe(false)
+    expect(archive.has('META-INF/encryption.xml')).toBe(false)
+  })
+})
