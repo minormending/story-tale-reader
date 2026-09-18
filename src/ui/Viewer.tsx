@@ -9,6 +9,7 @@ import { useReadAlong, type ReadAlongSettings } from './useReadAlong'
 import { usePageKeys } from './usePageKeys'
 import { usePageGestures } from './usePageGestures'
 import { useWakeLock } from './useWakeLock'
+import { useChromeAutoHide } from './useChromeAutoHide'
 import { LockButton } from './LockButton'
 import { BookmarkToggle, BookmarksSection } from './Bookmarks'
 import { addBookmark, listBookmarks, removeBookmark, type Bookmark } from '../store/bookmarks'
@@ -52,6 +53,9 @@ export function Viewer({
 
   // A picture book is read slowly enough to outlast a screen timeout.
   useWakeLock(true)
+
+  // The bars are drawn over the page; let them retire so it can be seen whole.
+  useChromeAutoHide(chromeVisible, () => setChromeVisible(false), menuOpen)
 
   const modal = useMemo(
     () => modalViewport(book.pages.map((page) => page.viewport)) ?? DEFAULT_VIEWPORT,

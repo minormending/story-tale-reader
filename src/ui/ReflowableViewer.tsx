@@ -4,6 +4,7 @@ import { useFrameSize } from './useFrameSize'
 import { usePageKeys } from './usePageKeys'
 import { usePageGestures } from './usePageGestures'
 import { useWakeLock } from './useWakeLock'
+import { useChromeAutoHide } from './useChromeAutoHide'
 import { LockButton } from './LockButton'
 import { BookmarkToggle, BookmarksSection } from './Bookmarks'
 import { captureAnchor, screenForAnchor } from '../reader/anchor'
@@ -45,6 +46,10 @@ export function ReflowableViewer({
   const [locked, setLocked] = useState(false)
 
   useWakeLock(true)
+
+  // The bars are drawn over the page; let them retire so it can be read whole.
+  useChromeAutoHide(chromeVisible, () => setChromeVisible(false), menuOpen)
+
   const [typography, setTypography] = useState<Typography>(DEFAULT_TYPOGRAPHY)
 
   const inline = useMemo(
