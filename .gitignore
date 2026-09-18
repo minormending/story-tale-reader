@@ -27,3 +27,6 @@ android/app/src/main/assets/public/
 *.jks
 keystore-credentials.txt
 .cache/
+
+# TypeScript build stamps: written on every typecheck, never worth committing.
+*.tsbuildinfo

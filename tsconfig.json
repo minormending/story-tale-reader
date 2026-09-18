@@ -16,6 +16,9 @@
     "resolveJsonModule": true,
     "allowImportingTsExtensions": true,
     "noEmit": true,
+    // Out of the repo: build mode writes this on every run, and in the root it
+    // showed up as a modified file in every unrelated diff.
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.tsbuildinfo",
     "types": ["vite/client", "node", "vite-plugin-pwa/client"]
   },
   "include": ["src", "vite.config.ts", "scripts"]
