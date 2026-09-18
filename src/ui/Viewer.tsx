@@ -12,6 +12,7 @@ import { useWakeLock } from './useWakeLock'
 import { useChromeAutoHide } from './useChromeAutoHide'
 import { LockButton } from './LockButton'
 import { BookmarkToggle, BookmarksSection } from './Bookmarks'
+import { ContentsSection } from './Contents'
 import { addBookmark, listBookmarks, removeBookmark, type Bookmark } from '../store/bookmarks'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { InlinePageResolver } from '../vfs/inline'
@@ -319,6 +320,20 @@ export function Viewer({
 
       {menuOpen && (
         <div className="menu" role="group" aria-label="Reading options">
+          <ContentsSection
+            items={book.nav}
+            currentPaths={[spread?.center?.path, spread?.left?.path, spread?.right?.path].filter(
+              (path): path is string => path !== undefined,
+            )}
+            onJump={(item) => {
+              // A fixed page has no interior to scroll to, so the fragment is
+              // dropped: the entry's page is the whole of what it can mean here.
+              const target = book.pages.findIndex((candidate) => candidate.path === item.path)
+              if (target === -1) return
+              setPageIndex(target)
+              setMenuOpen(false)
+            }}
+          />
           <BookmarksSection
             bookmarks={bookmarks}
             onJump={(bookmark) => {

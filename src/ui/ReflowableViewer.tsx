@@ -7,13 +7,14 @@ import { useWakeLock } from './useWakeLock'
 import { useChromeAutoHide } from './useChromeAutoHide'
 import { LockButton } from './LockButton'
 import { BookmarkToggle, BookmarksSection } from './Bookmarks'
-import { captureAnchor, screenForAnchor } from '../reader/anchor'
+import { ContentsSection } from './Contents'
+import { captureAnchor, screenForAnchor, screenForFragment } from '../reader/anchor'
 import { addBookmark, listBookmarks, removeBookmark, type Bookmark } from '../store/bookmarks'
 import { DEFAULT_TYPOGRAPHY, type ReaderFont, type ReaderTheme, type Typography } from '../reader/typography'
 import { InlinePageResolver } from '../vfs/inline'
 import { isVfsReady } from '../vfs/client'
 import type { ZipArchive } from '../engine/zip/reader'
-import type { ParsedBook } from '../engine/types'
+import type { NavItem, ParsedBook } from '../engine/types'
 
 export interface ReflowableViewerProps {
   bookId: string
@@ -94,6 +95,9 @@ export function ReflowableViewer({
    */
   const pendingAnchor = useRef<number | undefined>(initialAnchor)
 
+  /** The same, for a contents entry, which names its target by id rather than index. */
+  const pendingFragment = useRef<string | undefined>(undefined)
+
   const onMeasured = useCallback((count: number) => {
     setScreenCount(count)
 
@@ -108,6 +112,18 @@ export function ReflowableViewer({
         setScreen(Math.min(resolved, count - 1))
         return
       }
+    }
+
+    // A contents entry jumped here, pointing at an element rather than a position.
+    const fragment = pendingFragment.current
+    if (fragment !== undefined) {
+      pendingFragment.current = undefined
+      const doc = docRef.current
+      const resolved = doc ? screenForFragment(doc, frameWidthRef.current, fragment) : undefined
+      // An entry naming an id the section does not contain still opens the section,
+      // at its start: the chapter is the part the reader asked for.
+      setScreen(resolved === undefined ? 0 : Math.min(resolved, count - 1))
+      return
     }
 
     // Resolve a backwards page turn that landed at the end of the previous section.
@@ -257,6 +273,33 @@ export function ReflowableViewer({
     [sections, sectionIndex, frame.width, screenCount],
   )
 
+  /**
+   * Jump to a contents entry.
+   *
+   * The same two cases as a bookmark: a target in the section already on screen
+   * can be resolved immediately, while one in another section has to wait for that
+   * section to lay out before an element has any geometry to ask about.
+   */
+  const jumpToNav = useCallback(
+    (item: NavItem) => {
+      setMenuOpen(false)
+      const target = sections.findIndex((page) => page.path === item.path)
+      if (target === -1) return
+
+      if (target === sectionIndex) {
+        const doc = docRef.current
+        const resolved =
+          doc && item.fragment ? screenForFragment(doc, frame.width, item.fragment) : 0
+        setScreen(Math.min(resolved ?? 0, screenCount - 1))
+        return
+      }
+
+      pendingFragment.current = item.fragment || ''
+      setSectionIndex(target)
+    },
+    [sections, sectionIndex, frame.width, screenCount],
+  )
+
   const set = <K extends keyof Typography>(key: K, value: Typography[K]): void =>
     setTypography((current) => ({ ...current, [key]: value }))
 
@@ -321,6 +364,7 @@ export function ReflowableViewer({
 
       {menuOpen && (
         <div className="menu" role="group" aria-label="Reading options">
+          <ContentsSection items={book.nav} currentPaths={section ? [section.path] : []} onJump={jumpToNav} />
           <BookmarksSection
             bookmarks={bookmarks}
             onJump={jumpTo}

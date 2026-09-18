@@ -382,6 +382,16 @@ empty shelf. **Sourcing that sample is an open item — see §13.**
   focus on the button it pressed and guarding on that pinned the bars up for the rest
   of the book. When the bars do retire with focus still on one of their buttons, that
   focus is dropped rather than left on a control the reader cannot see.
+- The book's own table of contents, in the reader's menu. **Built**, and an
+  omission from this spec rather than something deferred: until it existed the only
+  way through a long book was Next, one screen at a time, plus whatever the reader
+  had bookmarked. Every format reaches it the same way — EPUB parses its nav
+  document or NCX, MOBI synthesises one while unpacking, PDF reads its outline
+  through pdf.js — and a book carrying no contents shows no section at all, which
+  is most picture books. A reflowable entry pointing at an element resolves to
+  whichever screen that element now falls on, by the same arithmetic bookmarks use
+  (§5.5), so it survives a change of type size; a fixed page has no interior to
+  scroll to, so the entry's page is the whole of what it can mean there.
 - Pinch to zoom up to 4×, pan while zoomed, tap to reset. **Built**, with two
   deviations: the whole spread zooms rather than one page, so a detail crossing the
   gutter stays whole and panning works across both halves; and a *single* tap

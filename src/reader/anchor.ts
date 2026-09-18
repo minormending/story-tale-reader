@@ -64,3 +64,26 @@ export function screenForAnchor(
   // A hair of tolerance: a column boundary can land a fraction under the frame.
   return Math.max(0, Math.floor(natural / frameWidth + 0.01))
 }
+
+/**
+ * Which screen a linked element falls on — the table of contents' equivalent.
+ *
+ * A contents entry names an element by id rather than by position, so unlike a
+ * bookmark it needs no index. The arithmetic is the same: the element's offset
+ * from the start of the section, divided by the width of a screen.
+ *
+ * Any element, not just a direct child of the body: a chapter heading is usually
+ * one, but an entry pointing mid-section can name anything the author gave an id.
+ */
+export function screenForFragment(
+  doc: Document,
+  frameWidth: number,
+  fragment: string,
+): number | undefined {
+  const body = doc.body
+  if (!body || !fragment || frameWidth <= 0) return undefined
+  const element = doc.getElementById(fragment)
+  if (!element) return undefined
+  const natural = element.getBoundingClientRect().left - translateX(body)
+  return Math.max(0, Math.floor(natural / frameWidth + 0.01))
+}
