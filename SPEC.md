@@ -375,6 +375,13 @@ empty shelf. **Sourcing that sample is an open item — see §13.**
 - Tap left third / right third → previous / next. Tap center → toggle chrome.
 - Swipe horizontally → page turn, with a short slide transition (no page-curl).
 - Chrome auto-hides after 3 s: back, title, page indicator, read-along controls, menu.
+  **Built**, with two things held back: an open menu suspends the countdown, since a
+  menu is anchored to the bar it came from; and so does a keyboard visit to a control
+  in the bars, so nobody is left focused on something with no opacity and no pointer
+  events. Keyboard specifically — `:focus-visible`, not focus, because a press leaves
+  focus on the button it pressed and guarding on that pinned the bars up for the rest
+  of the book. When the bars do retire with focus still on one of their buttons, that
+  focus is dropped rather than left on a control the reader cannot see.
 - Pinch to zoom up to 4×, pan while zoomed, tap to reset. **Built**, with two
   deviations: the whole spread zooms rather than one page, so a detail crossing the
   gutter stays whole and panning works across both halves; and a *single* tap
