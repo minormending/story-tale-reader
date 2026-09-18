@@ -3,6 +3,7 @@ import { readFileSync, existsSync } from 'node:fs'
 import { loadEpub } from './load'
 import { bufferSource } from '../zip/reader'
 import { buildSpreads } from '../layout/spread'
+import { parseSmil } from '../overlays/smil'
 
 /**
  * End-to-end checks against the committed synthetic fixtures. These encode the
@@ -128,5 +129,55 @@ describe.skipIf(!existsSync('public/sample/peter-rabbit.epub'))('the bundled sam
       const text = await archive.readText(page.path)
       expect(text).not.toMatch(/gutenberg/i)
     }
+  })
+})
+
+/**
+ * The narrated fixture exists for read-along across a page turn, which is the one
+ * thing the reference book could prove and nothing redistributable could. Its
+ * narration deliberately stops before the last spread, so both endings are here:
+ * a spread that has somewhere to carry on to, and one that does not.
+ */
+describe.skipIf(!has('narrated-spreads'))('fixture: narrated spreads', () => {
+  it('carries the overlay and the class the book highlights with', async () => {
+    const { book } = await load('narrated-spreads')
+    expect(book.layout).toBe('pre-paginated')
+    expect(book.activeClass).toBe('-epub-media-overlay-active')
+    // Pages 1-5 are narrated; 6 and 7 are back matter with no overlay at all.
+    expect(book.pages.map((p) => Boolean(p.overlayPath))).toEqual([
+      true, true, true, true, true, false, false,
+    ])
+  })
+
+  it('pairs the narration into spreads that end mid-book', async () => {
+    const { book } = await load('narrated-spreads')
+    expect(book.spreadSource).toBe('explicit')
+    expect(pairs(book)).toEqual([['center', 0], [1, 2], [3, 4], [5, 6]])
+  })
+
+  it('times every word, in order, against real audio', async () => {
+    const { book, archive } = await load('narrated-spreads')
+    const page = book.pages[1]!
+    const fragments = parseSmil(await archive.readText(page.overlayPath!), page.overlayPath!)
+
+    expect(fragments.map((f) => f.fragment)).toEqual(['w2-1', 'w2-2', 'w2-3', 'w2-4'])
+    expect(fragments.map((f) => [f.start, f.end])).toEqual([
+      [0, 0.4], [0.4, 0.8], [0.8, 1.2], [1.2, 1.6],
+    ])
+    // Every clip has to land inside a file that exists, or playback is silent and
+    // the page never advances -- which is the failure this fixture is here for.
+    for (const fragment of fragments) {
+      expect(fragment.textPath).toBe(page.path)
+      const audio = await archive.read(fragment.audioPath)
+      expect(audio.length).toBeGreaterThan(44)
+    }
+  })
+
+  it('leaves the last spread silent, so reading has a place to stop', async () => {
+    const { book } = await load('narrated-spreads')
+    const lastSpread = buildSpreads(book.pages, book.direction, true).at(-1)!
+    expect([lastSpread.left?.overlayPath, lastSpread.right?.overlayPath]).toEqual([
+      undefined, undefined,
+    ])
   })
 })

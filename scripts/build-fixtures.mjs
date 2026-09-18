@@ -193,6 +193,191 @@ ${paragraphs}
   console.log(`wrote ${OUT}/${name}.epub`)
 }
 
+
+/**
+ * A mono 8-bit PCM WAV, one tone burst per word.
+ *
+ * Generated rather than recorded: narration is the one thing the reference book
+ * has that nothing redistributable does, and a fixture that needs a real
+ * recording is a fixture nobody can regenerate. Each word gets its own pitch and
+ * its own fade, so playback is audibly segmented if anyone listens to it, and the
+ * clip boundaries in the SMIL line up with something real in the audio rather
+ * than with silence.
+ */
+function wordTones(wordCount, wordSeconds) {
+  const rate = 8000
+  const perWord = Math.round(rate * wordSeconds)
+  const samples = perWord * wordCount
+  const bytes = new Uint8Array(44 + samples)
+  const view = new DataView(bytes.buffer)
+  const ascii = (offset, text) => {
+    for (let i = 0; i < text.length; i++) view.setUint8(offset + i, text.charCodeAt(i))
+  }
+
+  ascii(0, 'RIFF')
+  view.setUint32(4, 36 + samples, true)
+  ascii(8, 'WAVE')
+  ascii(12, 'fmt ')
+  view.setUint32(16, 16, true)
+  view.setUint16(20, 1, true)          // PCM
+  view.setUint16(22, 1, true)          // mono
+  view.setUint32(24, rate, true)
+  view.setUint32(28, rate, true)       // byte rate: rate * channels * bytesPerSample
+  view.setUint16(32, 1, true)          // block align
+  view.setUint16(34, 8, true)          // bits per sample
+  ascii(36, 'data')
+  view.setUint32(40, samples, true)
+
+  for (let i = 0; i < samples; i++) {
+    const word = Math.floor(i / perWord)
+    const within = (i % perWord) / perWord
+    const envelope = Math.sin(Math.PI * within)
+    const tone = Math.sin((2 * Math.PI * (220 + word * 110) * i) / rate)
+    bytes[44 + i] = 128 + Math.round(60 * envelope * tone)
+  }
+  return bytes
+}
+
+const NARRATION = [
+  ['Once', 'upon', 'a', 'time'],
+  ['a', 'robin', 'built', 'her'],
+  ['nest', 'on', 'the', 'slide'],
+  ['which', 'was', 'everyone', 'agreed'],
+  ['a', 'most', 'inconvenient', 'place'],
+]
+
+const WORD_SECONDS = 0.4
+
+/** One narrated page: the words are spans so the overlay has something to highlight. */
+function narratedPage(n, words) {
+  const spans = words
+    .map((word, i) => `<span id="w${n}-${i + 1}">${word}</span>`)
+    .join(' ')
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml"><head>
+<meta name="viewport" content="width=${W}, height=${H}"/>
+<meta charset="UTF-8"/><title>Page ${n}</title>
+<link href="stylesheet.css" type="text/css" rel="stylesheet"/></head>
+<body><div class="page">
+<img src="images/p${n}.jpg" alt=""/>
+<p style="left: 60px; top: 260px;">${spans}</p>
+</div></body></html>`
+}
+
+function smilFor(n, words) {
+  const pars = words.map((_, i) => {
+    const begin = (i * WORD_SECONDS).toFixed(3)
+    const end = ((i + 1) * WORD_SECONDS).toFixed(3)
+    return `      <par id="p${n}s${i + 1}">
+        <text src="../p${n}.xhtml#w${n}-${i + 1}"/>
+        <audio src="../audio/p${n}.wav" clipBegin="${begin}s" clipEnd="${end}s"/>
+      </par>`
+  }).join('\n')
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<smil xmlns="http://www.w3.org/ns/SMIL" xmlns:epub="http://www.idpf.org/2007/ops" version="3.0">
+  <body>
+    <seq id="seq${n}" epub:textref="../p${n}.xhtml" epub:type="bodymatter">
+${pars}
+    </seq>
+  </body>
+</smil>`
+}
+
+/**
+ * A narrated fixed-layout book, for read-along that has to survive a page turn.
+ *
+ * Narration stops after page 5, so the last narrated spread is followed by a
+ * spread with no overlay at all. That is the shape that broke: reading to the end
+ * of a spread has to carry on over the turn, and reading to the end of the
+ * *narration* has to stop without dragging the reader into the back matter.
+ */
+async function buildNarrated() {
+  const name = 'narrated-spreads'
+  const count = 7
+  const narratedCount = NARRATION.length
+  const files = {
+    'mimetype': strToU8('application/epub+zip'),
+    'META-INF/container.xml': strToU8(CONTAINER),
+    'OEBPS/stylesheet.css': strToU8(`${CSS}
+.-epub-media-overlay-active { background: #ffd54a; border-radius: 6px; }`),
+  }
+
+  for (let n = 1; n <= count; n++) {
+    const colour = PALETTE[n % PALETTE.length]
+    files[`OEBPS/images/p${n}.jpg`] = new Uint8Array(
+      await pageImage(n, n % 2 === 0 ? 'left' : 'right', colour),
+    )
+    const words = NARRATION[n - 1]
+    files[`OEBPS/p${n}.xhtml`] = strToU8(words ? narratedPage(n, words) : fxlPage(n, false))
+    if (!words) continue
+    files[`OEBPS/smil/p${n}.smil`] = strToU8(smilFor(n, words))
+    files[`OEBPS/audio/p${n}.wav`] = wordTones(words.length, WORD_SECONDS)
+  }
+
+  const pageSeconds = (words) => (words.length * WORD_SECONDS).toFixed(3)
+  const totalSeconds = NARRATION.reduce((sum, words) => sum + words.length * WORD_SECONDS, 0)
+
+  const manifest = Array.from({ length: count }, (_, i) => {
+    const n = i + 1
+    const words = NARRATION[i]
+    const overlay = words ? ` media-overlay="smil${n}"` : ''
+    const rows = [
+      `<item id="p${n}" href="p${n}.xhtml" media-type="application/xhtml+xml"${overlay}/>`,
+      `<item id="img${n}" href="images/p${n}.jpg" media-type="image/jpeg"${i === 0 ? ' properties="cover-image"' : ''}/>`,
+    ]
+    if (words) {
+      rows.push(`<item id="smil${n}" href="smil/p${n}.smil" media-type="application/smil+xml"/>`)
+      rows.push(`<item id="audio${n}" href="audio/p${n}.wav" media-type="audio/wav"/>`)
+    }
+    return rows.join('\n    ')
+  }).join('\n    ')
+
+  const durations = Array.from({ length: narratedCount }, (_, i) =>
+    `<meta property="media:duration" refines="#smil${i + 1}">PT${pageSeconds(NARRATION[i])}S</meta>`,
+  ).join('\n    ')
+
+  const spine = Array.from({ length: count }, (_, i) => {
+    if (i === 0) return `<itemref idref="p1" properties="rendition:page-spread-center"/>`
+    return `<itemref idref="p${i + 1}" properties="page-spread-${i % 2 === 1 ? 'left' : 'right'}"/>`
+  }).join('\n    ')
+
+  files['OEBPS/package.opf'] = strToU8(`<?xml version="1.0"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="bookid"
+         prefix="rendition: http://www.idpf.org/vocab/rendition/#">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:title>Narrated Spreads</dc:title>
+    <dc:creator>Story Tale Reader fixtures</dc:creator>
+    <dc:identifier id="bookid">urn:uuid:narrated-spreads</dc:identifier>
+    <dc:language>en</dc:language>
+    <meta property="dcterms:modified">2026-01-01T00:00:00Z</meta>
+    <meta property="rendition:layout">pre-paginated</meta>
+    <meta property="rendition:spread">landscape</meta>
+    <meta property="media:active-class">-epub-media-overlay-active</meta>
+    <meta property="media:duration">PT${totalSeconds.toFixed(3)}S</meta>
+    ${durations}
+  </metadata>
+  <manifest>
+    <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
+    <item id="css" href="stylesheet.css" media-type="text/css"/>
+    ${manifest}
+  </manifest>
+  <spine>
+    ${spine}
+  </spine>
+</package>`)
+
+  files['OEBPS/nav.xhtml'] = strToU8(`<?xml version="1.0"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
+<head><title>Narrated Spreads</title></head><body>
+<nav epub:type="toc"><ol><li><a href="p1.xhtml">Start</a></li></ol></nav>
+<nav epub:type="page-list"><ol>${Array.from({ length: count }, (_, i) =>
+  `<li><a href="p${i + 1}.xhtml">${i + 1}</a></li>`).join('')}</ol></nav>
+</body></html>`)
+
+  await writeFile(`${OUT}/${name}.epub`, zipSync(files))
+  console.log(`wrote ${OUT}/${name}.epub`)
+}
+
 await mkdir(OUT, { recursive: true })
 await buildFixedLayout({ name: 'fxl-no-spread-hints' })
 await buildFixedLayout({ name: 'fxl-explicit-spreads', spreadHints: true })
@@ -200,3 +385,4 @@ await buildFixedLayout({ name: 'fxl-no-page-list', pageList: false })
 await buildFixedLayout({ name: 'fxl-rtl', direction: 'rtl' })
 await buildFixedLayout({ name: 'fxl-mixed-spread-page', wideAt: 5 })
 await buildReflowable()
+await buildNarrated()
