@@ -16,6 +16,8 @@ const ORDER: LoadStage[] = ['reading', 'unpacking', 'inspecting', 'measuring', '
 export interface BookLoading {
   title: string
   progress: LoadProgress
+  /** Set while importing a folder: which book of how many. */
+  batch?: { done: number; total: number }
 }
 
 /**
@@ -39,6 +41,11 @@ export function LoadingBook({ loading }: { loading: BookLoading }) {
   return (
     <div className="loading-backdrop" role="dialog" aria-modal="true" aria-labelledby="loading-title">
       <div className="loading-card">
+        {loading.batch && (
+          <p className="loading-batch">
+            Adding book {loading.batch.done + 1} of {loading.batch.total}
+          </p>
+        )}
         <p className="loading-book" id="loading-title">
           {loading.title}
         </p>

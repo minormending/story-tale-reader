@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { BuildTag } from './BuildTag'
+import { filesFromDrop, isBookFile } from './pickFiles'
 import type { LibraryEntry } from '../store/library'
 import { storageEstimate } from '../store/files'
 
@@ -20,6 +21,7 @@ export function Library({
   onOpenFile,
   onOpenEntry,
   onDelete,
+  onImportMany,
   busy,
   error,
   notice,
@@ -28,16 +30,28 @@ export function Library({
   onOpenFile: (file: File) => void
   onOpenEntry: (id: string) => void
   onDelete: (id: string) => void
+  onImportMany: (files: File[]) => void
   busy: string | null
   error: string | null
   notice: string | null
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
+  const folderRef = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
 
-  const take = (files: FileList | null): void => {
-    for (const file of Array.from(files ?? [])) onOpenFile(file)
+  /**
+   * One book opens; several are added to the shelf.
+   *
+   * Opening every file in a multi-selection was what this did before, which meant
+   * each one replaced the last and the reader landed in whichever happened to be
+   * final. Picking several books is a request for a shelf, not for a race.
+   */
+  const take = (files: File[]): void => {
+    const books = files.filter(isBookFile)
+    if (books.length === 0) return
+    if (books.length === 1 && books[0]) onOpenFile(books[0])
+    else onImportMany(books)
   }
 
   return (
@@ -51,7 +65,10 @@ export function Library({
       onDrop={(event) => {
         event.preventDefault()
         setDragging(false)
-        take(event.dataTransfer.files)
+        // Read the entries before awaiting: the transfer's item list is emptied as
+        // soon as this handler returns, so a dropped folder has to be walked from a
+        // snapshot taken now.
+        void filesFromDrop(event.dataTransfer).then(take)
       }}
     >
       <header className="library-head">
@@ -62,9 +79,19 @@ export function Library({
             spreads kept together.
           </p>
         </div>
-        <button className="primary" onClick={() => inputRef.current?.click()} disabled={!!busy}>
-          {busy ? 'Opening…' : 'Add a book'}
-        </button>
+        <div className="library-actions">
+          <button className="primary" onClick={() => inputRef.current?.click()} disabled={!!busy}>
+            {busy ? 'Opening…' : 'Add a book'}
+          </button>
+          <button
+            className="icon-button"
+            onClick={() => folderRef.current?.click()}
+            disabled={!!busy}
+            title="Add every book in a folder"
+          >
+            Add a folder
+          </button>
+        </div>
         <input
           ref={inputRef}
           type="file"
@@ -72,7 +99,20 @@ export function Library({
           multiple
           hidden
           onChange={(event) => {
-            take(event.target.files)
+            take(Array.from(event.target.files ?? []))
+            event.target.value = ''
+          }}
+        />
+        <input
+          ref={folderRef}
+          type="file"
+          // Not in the HTML standard, but the only thing every engine agrees on for
+          // picking a directory. React needs it lowercase in JSX.
+          {...{ webkitdirectory: '' }}
+          multiple
+          hidden
+          onChange={(event) => {
+            take(Array.from(event.target.files ?? []))
             event.target.value = ''
           }}
         />

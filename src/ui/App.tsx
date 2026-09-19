@@ -98,6 +98,53 @@ export function App() {
     [enter],
   )
 
+  /**
+   * Add many books at once, without opening any of them.
+   *
+   * Opening is the wrong ending for a folder: the reader asked for a shelf, not for
+   * the last book in the list. One failure does not stop the rest either — a folder
+   * of forty books will usually contain something that is not a book, or is
+   * encrypted, and refusing the whole import over one file would be useless.
+   */
+  const importMany = useCallback(
+    async (files: File[]) => {
+      setError(null)
+      setNotice(null)
+      const failures: string[] = []
+
+      for (const [index, file] of files.entries()) {
+        setBusy(`Adding ${index + 1} of ${files.length}…`)
+        setLoading({
+          title: file.name,
+          progress: { stage: 'reading' },
+          batch: { done: index, total: files.length },
+        })
+        try {
+          await importBook(file, (progress) => setLoading((at) => at && { ...at, progress }))
+        } catch (cause) {
+          failures.push(`${file.name}: ${cause instanceof Error ? cause.message : String(cause)}`)
+        }
+      }
+
+      setBusy(null)
+      setLoading(null)
+      setEntries(await listLibrary())
+
+      const added = files.length - failures.length
+      if (failures.length === 0) {
+        setNotice(`Added ${added} ${added === 1 ? 'book' : 'books'}.`)
+      } else {
+        // Named, not counted: "3 books could not be added" leaves the reader to work
+        // out which, from a shelf they have not seen before.
+        setNotice(
+          `Added ${added} of ${files.length}. These could not be opened — ` +
+            failures.join('; '),
+        )
+      }
+    },
+    [],
+  )
+
   const openEntry = useCallback(
     async (id: string) => {
       setError(null)
@@ -197,6 +244,7 @@ export function App() {
       <Library
       entries={entries}
       onOpenFile={(file) => void openFile(file)}
+      onImportMany={(files) => void importMany(files)}
       onOpenEntry={(id) => void openEntry(id)}
       onDelete={(id) => void remove(id)}
       busy={busy}

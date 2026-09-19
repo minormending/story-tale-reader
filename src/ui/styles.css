@@ -617,3 +617,13 @@ button { font: inherit; cursor: pointer; }
   .loading-fill-sweep { animation: none; width: 100%; opacity: 0.45; }
   .loading-fill { transition: none; }
 }
+
+.loading-batch {
+  margin: 0 0 0.2rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.library-actions { display: flex; align-items: center; gap: 0.5rem; }
