@@ -63,6 +63,21 @@ export interface LayoutMeasurement {
   viewports: Array<Viewport | undefined>
 }
 
+export interface LoadOptions {
+  /** A previous open's measurement, which makes measuring unnecessary. */
+  cached?: LayoutMeasurement
+  /**
+   * Resolve every page's intrinsic size. Default true.
+   *
+   * Adding a book to the shelf does not need it: the entry keeps a title, an
+   * author, a page count, a layout and a cover, and none of those depend on how big
+   * any individual page is. Importing a folder of forty books would otherwise
+   * measure every page of every one of them, most of which nobody is about to open.
+   * The first open measures, and keeps the result.
+   */
+  measure?: boolean
+}
+
 export interface LoadedEpub {
   book: ParsedBook
   archive: ZipArchive
@@ -76,7 +91,7 @@ export async function loadEpub(
   source: ByteSource,
   overrides: LayoutOverrides = {},
   onProgress?: ProgressReporter,
-  cached?: LayoutMeasurement,
+  options: LoadOptions = {},
 ): Promise<LoadedEpub> {
   const report: ProgressReporter = onProgress ?? (() => {})
 
@@ -111,6 +126,7 @@ export async function loadEpub(
   }
 
   const declaredLayout = pkg.meta.get('rendition:layout')
+  const { cached, measure = true } = options
   const usable = cached && cached.pageCount === entries.length ? cached : undefined
   const needsSampling = !declaredLayout && !ibooksFixedLayout && !usable
   let viewportCoverage = usable?.viewportCoverage ?? 0
@@ -140,18 +156,21 @@ export async function loadEpub(
     // Only this branch is slow, and only when the book declares no viewport of its
     // own: every page is read, and a page without a viewport meta has its main
     // image's header decoded as well.
-    const measured = !overrides.viewportOverride && !declaredViewport && !usable
-    report({ stage: 'measuring', done: 0, total: entries.length })
-    for (const [index, { item }] of entries.entries()) {
-      viewports.push(
-        overrides.viewportOverride ??
-          declaredViewport ??
-          usable?.viewports[index] ??
-          (await resolvePageViewport(archive, item.path)),
-      )
-      if (!measured) continue
-      report({ stage: 'measuring', done: index + 1, total: entries.length })
-      if ((index + 1) % YIELD_EVERY === 0) await yieldToPaint()
+    const fixed = overrides.viewportOverride ?? declaredViewport
+    if (!fixed && !usable && !measure) {
+      // Deferred: every page takes the book's default size for now, which is enough
+      // to describe it on a shelf. Nothing is written to the cache, so the first
+      // real open measures properly rather than inheriting these placeholders.
+      for (let i = 0; i < entries.length; i++) viewports.push(undefined)
+    } else {
+      const measured = !fixed && !usable
+      report({ stage: 'measuring', done: 0, total: entries.length })
+      for (const [index, { item }] of entries.entries()) {
+        viewports.push(fixed ?? usable?.viewports[index] ?? (await resolvePageViewport(archive, item.path)))
+        if (!measured) continue
+        report({ stage: 'measuring', done: index + 1, total: entries.length })
+        if ((index + 1) % YIELD_EVERY === 0) await yieldToPaint()
+      }
     }
   } else {
     for (let i = 0; i < entries.length; i++) viewports.push(undefined)
@@ -222,7 +241,8 @@ export async function loadEpub(
     measurement: {
       pageCount: entries.length,
       viewportCoverage,
-      viewports: overrides.viewportOverride ? (usable?.viewports ?? []) : viewports,
+      viewports:
+        overrides.viewportOverride || !measure ? (usable?.viewports ?? []) : viewports,
     },
   }
 }

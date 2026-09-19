@@ -120,7 +120,12 @@ export function App() {
           batch: { done: index, total: files.length },
         })
         try {
-          await importBook(file, (progress) => setLoading((at) => at && { ...at, progress }))
+          // Nothing here is about to be rendered, so the pages need not be measured:
+          // the entry only wants a title, an author, a count and a cover. Whichever
+          // of these the reader opens first will measure it then, and keep it.
+          await importBook(file, (progress) => setLoading((at) => at && { ...at, progress }), {
+            measure: false,
+          })
         } catch (cause) {
           failures.push(`${file.name}: ${cause instanceof Error ? cause.message : String(cause)}`)
         }

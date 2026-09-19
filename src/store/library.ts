@@ -96,7 +96,7 @@ async function parse(
   blob: Blob,
   fileName: string,
   onProgress?: ProgressReporter,
-  cached?: LayoutMeasurement,
+  options: { cached?: LayoutMeasurement; measure?: boolean } = {},
 ): Promise<Omit<OpenedBook, 'entry'> & { measurement?: LayoutMeasurement }> {
   const format = await detectBlobFormat(blob)
 
@@ -117,7 +117,7 @@ async function parse(
     throw new Error('This file is not an EPUB, PDF or MOBI book.')
   }
 
-  const { book, archive, measurement } = await loadEpub(blobSource(blob), {}, onProgress, cached)
+  const { book, archive, measurement } = await loadEpub(blobSource(blob), {}, onProgress, options)
   return { book, archive, measurement }
 }
 
@@ -151,13 +151,24 @@ async function recallMeasurement(id: string): Promise<LayoutMeasurement | undefi
   }
 }
 
-export async function importBook(file: File, onProgress?: ProgressReporter): Promise<OpenedBook> {
+export async function importBook(
+  file: File,
+  onProgress?: ProgressReporter,
+  /**
+   * Adding to the shelf without opening. Skips measuring the pages, which the entry
+   * does not need and which the first open will do anyway.
+   */
+  options: { measure?: boolean } = {},
+): Promise<OpenedBook> {
   onProgress?.({ stage: 'reading' })
   const id = await fingerprint(file)
   const existing = await get<LibraryEntry>(STORE_BOOKS, id)
 
   // Parse before storing: a book we cannot open should not enter the library.
-  const opened = await parse(file, file.name, onProgress, await recallMeasurement(id))
+  const opened = await parse(file, file.name, onProgress, {
+    cached: await recallMeasurement(id),
+    measure: options.measure,
+  })
 
   // Storing is best effort from here on. The book is parsed and in memory, so a
   // full or restricted quota should cost the reader their shelf entry, not their
@@ -222,7 +233,7 @@ export async function openStoredBook(id: string, onProgress?: ProgressReporter):
     )
   }
 
-  const opened = await parse(blob, entry.fileName, onProgress, await recallMeasurement(id))
+  const opened = await parse(blob, entry.fileName, onProgress, { cached: await recallMeasurement(id) })
   const touched: LibraryEntry = { ...entry, lastOpenedAt: Date.now() }
   await saveEntry(touched)
   await rememberMeasurement(id, opened.measurement)

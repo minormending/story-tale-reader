@@ -208,8 +208,28 @@ describe.skipIf(!has('fxl-explicit-spreads'))('fixture: reusing a measurement', 
       viewports: measurement.viewports.map(() => invented),
     }
 
-    const { book } = await loadEpub(bufferSource(readFileSync(fixture('fxl-explicit-spreads'))), {}, undefined, planted)
+    const { book } = await loadEpub(bufferSource(readFileSync(fixture('fxl-explicit-spreads'))), {}, undefined, { cached: planted })
     expect(book.pages.map((page) => page.viewport)).toEqual(book.pages.map(() => invented))
+  })
+
+  it('describes a book without measuring it, and offers nothing to cache', async () => {
+    const full = await load('fxl-explicit-spreads')
+    const { book, measurement } = await loadEpub(
+      bufferSource(readFileSync(fixture('fxl-explicit-spreads'))),
+      {},
+      undefined,
+      { measure: false },
+    )
+
+    // Everything a shelf entry needs survives.
+    expect(book.pages).toHaveLength(full.book.pages.length)
+    expect(book.layout).toBe(full.book.layout)
+    expect(book.metadata.title).toBe(full.book.metadata.title)
+
+    // The sizes are placeholders, so they must not reach the cache: a short list
+    // against a full page count is what the cache refuses to store.
+    expect(measurement.viewports).toHaveLength(0)
+    expect(measurement.pageCount).toBe(full.book.pages.length)
   })
 
   it('ignores a measurement taken against a different number of pages', async () => {
@@ -220,7 +240,7 @@ describe.skipIf(!has('fxl-explicit-spreads'))('fixture: reusing a measurement', 
       viewports: measurement.viewports.map(() => ({ width: 111, height: 222 })),
     }
 
-    const { book } = await loadEpub(bufferSource(readFileSync(fixture('fxl-explicit-spreads'))), {}, undefined, stale)
+    const { book } = await loadEpub(bufferSource(readFileSync(fixture('fxl-explicit-spreads'))), {}, undefined, { cached: stale })
     // Measured afresh, so the real sizes are back.
     expect(book.pages.map((p) => p.viewport)).toEqual(first.pages.map((p) => p.viewport))
   })
