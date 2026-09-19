@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { BuildTag } from './BuildTag'
 import { filesFromDrop, isBookFile } from './pickFiles'
 import { groupIntoSeries } from '../engine/series'
+import { SORT_LABELS, matchesQuery, sortShelf, type ShelfSort } from './shelf'
 import type { LibraryEntry } from '../store/library'
 import { storageEstimate } from '../store/files'
 
@@ -40,12 +41,19 @@ export function Library({
   const folderRef = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+  const [query, setQuery] = useState('')
+  const [sort, setSort] = useState<ShelfSort>('recent')
 
   // Series are worked out from the shelf rather than stored, so adding the second
   // book of a pair groups the first one too, with no re-import.
-  const { groups, loose, byId } = useMemo(() => {
+  const { groups, loose, byId, shown } = useMemo(() => {
+    const visible = sortShelf(
+      entries.filter((entry) => matchesQuery(entry, query)),
+      sort,
+    )
+
     const found = groupIntoSeries(
-      entries.map((entry) => ({
+      visible.map((entry) => ({
         id: entry.id,
         title: entry.title,
         creator: entry.creator,
@@ -53,13 +61,28 @@ export function Library({
         seriesIndex: entry.seriesIndex,
       })),
     )
+
+    // Series are grouped from what is *shown*, so a search that matches one book of
+    // three dissolves the group rather than claiming a series of one.
     const grouped = new Set(found.flatMap((group) => group.books.map((book) => book.id)))
+    const place = new Map(visible.map((entry, index) => [entry.id, index]))
+
+    // The sort orders the shelf; grouping is a view over it. A group sits where its
+    // best-placed member would have sat, and keeps its own order inside, because
+    // reading a series out of sequence is not an order anybody asked for.
+    const ordered = [...found].sort(
+      (a, b) =>
+        Math.min(...a.books.map((x) => place.get(x.id) ?? Infinity)) -
+        Math.min(...b.books.map((x) => place.get(x.id) ?? Infinity)),
+    )
+
     return {
-      groups: found,
-      loose: entries.filter((entry) => !grouped.has(entry.id)),
+      groups: ordered,
+      loose: visible.filter((entry) => !grouped.has(entry.id)),
       byId: new Map(entries.map((entry) => [entry.id, entry])),
+      shown: visible.length,
     }
-  }, [entries])
+  }, [entries, query, sort])
 
   /**
    * One book opens; several are added to the shelf.
@@ -142,8 +165,40 @@ export function Library({
       {error && <p className="banner banner-error">{error}</p>}
       {notice && <p className="banner banner-warn">{notice}</p>}
 
+      {/* Only worth the room once there is enough on the shelf to lose a book in. */}
+      {entries.length > 4 && (
+        <div className="shelf-controls">
+          <label className="shelf-search">
+            <span className="visually-hidden">Search your books</span>
+            <input
+              type="search"
+              value={query}
+              placeholder="Search by title, author or series"
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </label>
+          <label className="shelf-sort">
+            <span className="muted">Sort</span>
+            <select value={sort} onChange={(event) => setSort(event.target.value as ShelfSort)}>
+              {(Object.keys(SORT_LABELS) as ShelfSort[]).map((option) => (
+                <option key={option} value={option}>
+                  {SORT_LABELS[option]}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
+
       <main className="library-main">
-      {entries.length === 0 ? (
+      {entries.length > 0 && shown === 0 ? (
+        <p className="shelf-empty muted">
+          Nothing matches &ldquo;{query}&rdquo;.{' '}
+          <button className="link-button" onClick={() => setQuery('')}>
+            Show all {entries.length} books
+          </button>
+        </p>
+      ) : entries.length === 0 ? (
         <div className={`dropzone${dragging ? ' dropzone-active' : ''}`}>
           <p className="dropzone-title">Your shelf is empty</p>
           <p className="muted">Drop a book here, or use &ldquo;Add a book&rdquo;.</p>
