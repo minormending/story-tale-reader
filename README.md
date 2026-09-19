@@ -14,6 +14,17 @@ It also plays **read-along narration with word-level highlighting** (EPUB 3 Medi
 Overlays) — a feature almost no Android reader supports, despite the timing data
 shipping inside the books.
 
+## Documentation
+
+- **[docs/](docs/README.md)** — how the reader works, for someone new to the code:
+  [architecture](docs/architecture.md), [opening a book](docs/opening-a-book.md),
+  [fixed layout and spreads](docs/fixed-layout.md), [read-along](docs/read-along.md),
+  [storage and offline](docs/storage-and-offline.md). Diagrams throughout, with
+  collapsed **Advanced** sections for the details behind each decision.
+- **[SPEC.md](SPEC.md)** — the contract: what is promised, what is built, what is
+  deliberately missing.
+- **[docs/device-test.md](docs/device-test.md)** — checking a build on real hardware.
+
 ## What it does
 
 - **Fixed-layout EPUB**, rendered the way it was drawn. Each page gets an iframe at its
