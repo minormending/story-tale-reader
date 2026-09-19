@@ -145,6 +145,15 @@ pushing a `v*` tag builds and publishes a signed APK.
 can see costs a published release and an APK identical to the one before it. Let that
 work ride along with the next tag that carries a user-facing change.
 
+## Licence
+
+This project is MIT licensed — see [LICENSE](LICENSE). By contributing, you agree
+your contributions are licensed under the same terms.
+
+The licence covers the *software*. Books are a separate question: the bundled sample
+is public domain, the fixtures are generated, and no in-copyright book is in this
+repository at all.
+
 ## Testing on a device
 
 Three of the remaining gaps in SPEC.md §13 are open only because nobody has run the

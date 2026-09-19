@@ -83,4 +83,6 @@ need them skip themselves when they are absent.
 
 ## License
 
-MIT for the code. No book content is distributed with this repository.
+MIT — see [LICENSE](LICENSE). That covers the code; no in-copyright book content is
+distributed with this repository. The bundled sample is public domain and the test
+fixtures are generated.
