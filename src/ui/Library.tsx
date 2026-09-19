@@ -105,7 +105,7 @@ export function Library({
             {busy ? 'Opening…' : 'Add a book'}
           </button>
           <button
-            className="icon-button"
+            className="secondary"
             onClick={() => folderRef.current?.click()}
             disabled={!!busy}
             title="Add every book in a folder"

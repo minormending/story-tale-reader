@@ -71,6 +71,33 @@ button { font: inherit; cursor: pointer; }
   min-height: 44px;
 }
 
+/*
+ * The quieter half of a pair of actions.
+ *
+ * Same pill, same height and the same top margin as .primary, so the two sit on one
+ * line and read as siblings; outlined rather than filled, because adding a folder is
+ * the rarer thing and should not compete with adding a book. Styled as a button at
+ * all, which .icon-button was not: transparent with no border, beside a filled pill,
+ * it read as a stray label.
+ */
+.secondary {
+  /* No margin-top, unlike .primary: the rule .primary carries is overridden where
+     these two sit together, so copying it only pushed this one down a few pixels
+     and left the pair looking untidy. Flex centring does the aligning. */
+  background: transparent;
+  color: var(--fg);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  /* A pixel off each edge, so the border does not make this the taller of the two:
+     .primary has none, and two buttons on one line should be one height. */
+  padding: calc(0.7rem - 1px) calc(1.2rem - 1px);
+  font-weight: 600;
+  min-height: 44px;
+}
+
+.secondary:disabled { color: var(--fg-muted); opacity: 0.45; cursor: default; }
+.secondary:not(:disabled):hover { background: rgba(255, 255, 255, 0.07); border-color: var(--fg-muted); }
+
 .banner { border-radius: 10px; padding: 0.75rem 1rem; margin: 0; font-size: 0.95rem; }
 .banner-warn { background: rgba(255, 180, 84, 0.12); color: var(--accent); }
 .banner-error { background: rgba(255, 128, 128, 0.12); color: var(--danger); }
@@ -625,7 +652,7 @@ button { font: inherit; cursor: pointer; }
   color: var(--accent);
 }
 
-.library-actions { display: flex; align-items: center; gap: 0.5rem; }
+.library-actions { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
 
 /* ----------------------------------------------------------------- series --- */
 
