@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Library } from './Library'
+import { LoadingBook, type BookLoading } from './LoadingBook'
 import { Viewer } from './Viewer'
 import { ReflowableViewer } from './ReflowableViewer'
 import { DrmError } from '../engine/epub/ocf'
@@ -29,6 +30,7 @@ export function App() {
   const [session, setSession] = useState<Session | null>(null)
   const [overrides, setOverrides] = useState<LayoutOverrides>({})
   const [busy, setBusy] = useState<string | null>(null)
+  const [loading, setLoading] = useState<BookLoading | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
@@ -83,12 +85,14 @@ export function App() {
     async (file: File) => {
       setError(null)
       setBusy(`Opening ${file.name}…`)
+      setLoading({ title: file.name, progress: { stage: 'reading' } })
       try {
-        await enter(await importBook(file))
+        await enter(await importBook(file, (progress) => setLoading((at) => at && { ...at, progress })))
       } catch (cause) {
         setError(describe(cause))
       } finally {
         setBusy(null)
+        setLoading(null)
       }
     },
     [enter],
@@ -98,15 +102,20 @@ export function App() {
     async (id: string) => {
       setError(null)
       setBusy('Opening…')
+      // The title is already known for a book on the shelf, so the card can name it
+      // straight away rather than waiting for the file to be parsed.
+      const known = entries.find((entry) => entry.id === id)
+      setLoading({ title: known?.title ?? 'Opening', progress: { stage: 'reading' } })
       try {
-        await enter(await openStoredBook(id))
+        await enter(await openStoredBook(id, (progress) => setLoading((at) => at && { ...at, progress })))
       } catch (cause) {
         setError(describe(cause))
       } finally {
         setBusy(null)
+        setLoading(null)
       }
     },
-    [enter],
+    [enter, entries],
   )
 
   // Android: a book handed to us by a file manager or the share sheet, both at
@@ -183,7 +192,9 @@ export function App() {
   }
 
   return (
-    <Library
+    <>
+      {loading && <LoadingBook loading={loading} />}
+      <Library
       entries={entries}
       onOpenFile={(file) => void openFile(file)}
       onOpenEntry={(id) => void openEntry(id)}
@@ -191,6 +202,7 @@ export function App() {
       busy={busy}
       error={error}
       notice={notice}
-    />
+      />
+    </>
   )
 }

@@ -7,7 +7,13 @@ import { ZipArchive, blobSource } from '../engine/zip/reader'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { dirname, resolvePath, mimeTypeFor } from '../engine/path'
 import { primaryImageHref } from '../engine/layout/viewport'
-import type { BookFormat, LayoutMode, LayoutOverrides, ParsedBook } from '../engine/types'
+import type {
+  BookFormat,
+  LayoutMode,
+  LayoutOverrides,
+  ParsedBook,
+  ProgressReporter,
+} from '../engine/types'
 import { STORE_BOOKS, STORE_OVERRIDES, STORE_PROGRESS, get, getAll, put, remove } from './idb'
 import { deleteBookFile, loadBookFile, requestPersistence, saveBookFile } from './files'
 import { removeBookmarksFor } from './bookmarks'
@@ -73,15 +79,21 @@ export async function listLibrary(): Promise<LibraryEntry[]> {
 }
 
 /** Open a blob as whatever it actually is, rather than trusting its extension. */
-async function parse(blob: Blob, fileName: string): Promise<Omit<OpenedBook, 'entry'>> {
+async function parse(
+  blob: Blob,
+  fileName: string,
+  onProgress?: ProgressReporter,
+): Promise<Omit<OpenedBook, 'entry'>> {
   const format = await detectBlobFormat(blob)
 
   if (format === 'pdf') {
+    onProgress?.({ stage: 'unpacking' })
     const { book, document } = await loadPdf(await blob.arrayBuffer(), stripExtension(fileName))
     return { book, pdf: document }
   }
 
   if (format === 'mobi') {
+    onProgress?.({ stage: 'unpacking' })
     const { loadMobi } = await import('../engine/mobi/load')
     const { book, archive } = await loadMobi(new Uint8Array(await blob.arrayBuffer()), stripExtension(fileName))
     return { book, archive }
@@ -91,7 +103,7 @@ async function parse(blob: Blob, fileName: string): Promise<Omit<OpenedBook, 'en
     throw new Error('This file is not an EPUB, PDF or MOBI book.')
   }
 
-  const { book, archive } = await loadEpub(blobSource(blob))
+  const { book, archive } = await loadEpub(blobSource(blob), {}, onProgress)
   return { book, archive }
 }
 
@@ -99,16 +111,18 @@ function stripExtension(name: string): string {
   return name.replace(/\.[^.]+$/, '') || 'Untitled'
 }
 
-export async function importBook(file: File): Promise<OpenedBook> {
+export async function importBook(file: File, onProgress?: ProgressReporter): Promise<OpenedBook> {
+  onProgress?.({ stage: 'reading' })
   const id = await fingerprint(file)
   const existing = await get<LibraryEntry>(STORE_BOOKS, id)
 
   // Parse before storing: a book we cannot open should not enter the library.
-  const opened = await parse(file, file.name)
+  const opened = await parse(file, file.name, onProgress)
 
   // Storing is best effort from here on. The book is parsed and in memory, so a
   // full or restricted quota should cost the reader their shelf entry, not their
   // ability to read the book they just opened.
+  onProgress?.({ stage: 'saving' })
   const stored = await saveBookFile(id, file)
   void requestPersistence()
 
@@ -148,10 +162,11 @@ async function saveEntry(entry: LibraryEntry): Promise<boolean> {
   }
 }
 
-export async function openStoredBook(id: string): Promise<OpenedBook> {
+export async function openStoredBook(id: string, onProgress?: ProgressReporter): Promise<OpenedBook> {
   const entry = await get<LibraryEntry>(STORE_BOOKS, id)
   if (!entry) throw new Error('That book is no longer in the library')
 
+  onProgress?.({ stage: 'reading' })
   const blob = await loadBookFile(id)
   if (!blob) {
     // The record outlived its file — the browser evicted it under storage
@@ -164,7 +179,7 @@ export async function openStoredBook(id: string): Promise<OpenedBook> {
     )
   }
 
-  const opened = await parse(blob, entry.fileName)
+  const opened = await parse(blob, entry.fileName, onProgress)
   const touched: LibraryEntry = { ...entry, lastOpenedAt: Date.now() }
   await saveEntry(touched)
   return { entry: touched, ...opened, persisted: true }

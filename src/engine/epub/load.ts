@@ -12,13 +12,35 @@ import {
   viewportFromDocument, primaryImageHref, imageSize, modalViewport, DEFAULT_VIEWPORT,
 } from '../layout/viewport'
 import { assignSpreadSides, type SpreadCandidate } from '../layout/spread'
-import type { BookPage, LayoutOverrides, ParsedBook, Viewport } from '../types'
+import type {
+  BookPage,
+  LayoutOverrides,
+  ParsedBook,
+  ProgressReporter,
+  Viewport,
+} from '../types'
 
 const IBOOKS_OPTIONS = 'META-INF/com.apple.ibooks.display-options.xml'
 const CONTAINER = 'META-INF/container.xml'
 
 /** How many spine documents to sample when the book declares no layout. */
 const DETECTION_SAMPLE = 12
+
+/** Pages measured between yields back to the event loop. */
+const YIELD_EVERY = 4
+
+/**
+ * Hand the event loop back for one turn, so progress can be painted.
+ *
+ * Awaiting a zip read is not enough on its own. Over an in-memory buffer the read
+ * resolves in a microtask, and microtasks all drain before the renderer gets a turn
+ * — so a hundred awaited reads paint nothing, and the app looks frozen on exactly
+ * the long load the progress exists to explain. A timeout is a macrotask, which
+ * does yield.
+ */
+function yieldToPaint(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0))
+}
 
 export interface LoadedEpub {
   book: ParsedBook
@@ -27,9 +49,17 @@ export interface LoadedEpub {
   nav: NavDocument
 }
 
-export async function loadEpub(source: ByteSource, overrides: LayoutOverrides = {}): Promise<LoadedEpub> {
+export async function loadEpub(
+  source: ByteSource,
+  overrides: LayoutOverrides = {},
+  onProgress?: ProgressReporter,
+): Promise<LoadedEpub> {
+  const report: ProgressReporter = onProgress ?? (() => {})
+
+  report({ stage: 'unpacking' })
   const archive = await ZipArchive.open(source)
 
+  report({ stage: 'inspecting' })
   const drm = await detectDrm(archive)
   if (drm) {
     throw new DrmError(
@@ -82,12 +112,20 @@ export async function loadEpub(source: ByteSource, overrides: LayoutOverrides = 
   const viewports: Array<Viewport | undefined> = []
   if (decision.layout === 'pre-paginated') {
     const declaredViewport = parsePackageViewport(pkg)
-    for (const { item } of entries) {
+    // Only this branch is slow, and only when the book declares no viewport of its
+    // own: every page is read, and a page without a viewport meta has its main
+    // image's header decoded as well.
+    const measured = !overrides.viewportOverride && !declaredViewport
+    report({ stage: 'measuring', done: 0, total: entries.length })
+    for (const [index, { item }] of entries.entries()) {
       viewports.push(
         overrides.viewportOverride ??
           declaredViewport ??
           (await resolvePageViewport(archive, item.path)),
       )
+      if (!measured) continue
+      report({ stage: 'measuring', done: index + 1, total: entries.length })
+      if ((index + 1) % YIELD_EVERY === 0) await yieldToPaint()
     }
   } else {
     for (let i = 0; i < entries.length; i++) viewports.push(undefined)
@@ -107,6 +145,7 @@ export async function loadEpub(source: ByteSource, overrides: LayoutOverrides = 
     viewport: viewports[index] ?? modal,
   }))
 
+  report({ stage: 'pairing' })
   const assignment = assignSpreadSides(candidates, {
     pageList: nav.pageList,
     direction: pkg.direction,

@@ -79,3 +79,28 @@ export interface ParsedBook {
   /** Container-absolute path of the package document, for resolving hrefs. */
   packagePath: string
 }
+
+/**
+ * Coarse stages of opening a book, for progress reporting.
+ *
+ * Opening a picture book is not instant: a fixed-layout book has its page sizes
+ * resolved one document at a time, which for a hundred-page book means a hundred
+ * reads and, where a page declares no viewport, an image header decode as well. The
+ * reader reports where it has got to rather than showing a frozen name.
+ */
+export type LoadStage =
+  | 'reading'    // getting the bytes, and fingerprinting them
+  | 'unpacking'  // opening the archive
+  | 'inspecting' // container, package document, navigation
+  | 'measuring'  // per-page viewports: the long one, and countable
+  | 'pairing'    // deciding which pages face each other
+  | 'saving'     // writing to the shelf
+
+export interface LoadProgress {
+  stage: LoadStage
+  /** Completed and total units, for the stages that have countable work. */
+  done?: number
+  total?: number
+}
+
+export type ProgressReporter = (progress: LoadProgress) => void
