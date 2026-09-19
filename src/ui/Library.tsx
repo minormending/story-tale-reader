@@ -141,7 +141,6 @@ export function Library({
 
       {error && <p className="banner banner-error">{error}</p>}
       {notice && <p className="banner banner-warn">{notice}</p>}
-      {busy && <p className="banner banner-busy">{busy}</p>}
 
       <main className="library-main">
       {entries.length === 0 ? (
