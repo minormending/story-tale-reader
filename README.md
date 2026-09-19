@@ -24,6 +24,7 @@ shipping inside the books.
 - **[SPEC.md](SPEC.md)** — the contract: what is promised, what is built, what is
   deliberately missing.
 - **[docs/device-test.md](docs/device-test.md)** — checking a build on real hardware.
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** — setup, conventions, and what “done” means here.
 
 ## What it does
 
