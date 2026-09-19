@@ -1,4 +1,16 @@
+import { useEffect, useState } from 'react'
 import type { LoadProgress, LoadStage } from '../engine/types'
+
+/**
+ * How long a book may take before the reader is told anything.
+ *
+ * Most books open far too quickly to need a progress card: the reference book, 14MB
+ * and 35 pages, imports in about 120ms on a laptop. Showing a modal for a tenth of a
+ * second is worse than showing nothing — it reads as a flicker, and the reader has
+ * no time to take in what it said. Below this threshold the open simply happens;
+ * above it, something was genuinely slow and saying so is the whole point.
+ */
+const SHOW_AFTER_MS = 250
 
 /** What each stage is called, in words a parent would use. */
 const LABELS: Record<LoadStage, string> = {
@@ -33,10 +45,21 @@ export interface BookLoading {
  * work is countable the bar says how much is left rather than spinning to no purpose.
  */
 export function LoadingBook({ loading }: { loading: BookLoading }) {
+  // Mounted when the load begins and unmounted when it ends, so the wait is timed
+  // from the start and not restarted by each progress report. A folder import keeps
+  // the card mounted between books, which is right: once it is up, it stays up.
+  const [due, setDue] = useState(false)
+  useEffect(() => {
+    const timer = setTimeout(() => setDue(true), SHOW_AFTER_MS)
+    return () => clearTimeout(timer)
+  }, [])
+
   const { stage, done, total } = loading.progress
   const countable = total !== undefined && total > 0 && done !== undefined
   const percent = countable ? Math.round((done / total) * 100) : 0
   const reached = ORDER.indexOf(stage)
+
+  if (!due) return null
 
   return (
     <div className="loading-backdrop" role="dialog" aria-modal="true" aria-labelledby="loading-title">
