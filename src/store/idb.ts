@@ -7,13 +7,15 @@
  */
 
 const DB_NAME = 'story-tale-reader'
-const DB_VERSION = 2
+const DB_VERSION = 3
 
 export const STORE_BOOKS = 'books'
 export const STORE_PROGRESS = 'progress'
 export const STORE_OVERRIDES = 'overrides'
 export const STORE_BLOBS = 'blobs'
 export const STORE_BOOKMARKS = 'bookmarks'
+/** What a book's pages measured to last time, so reopening need not measure again. */
+export const STORE_LAYOUT = 'layout'
 
 let connection: Promise<IDBDatabase> | undefined
 
@@ -24,7 +26,14 @@ export function openDatabase(): Promise<IDBDatabase> {
       const db = request.result
       // Creating only what is missing, so a version bump never disturbs the
       // stores an existing reader already has books in.
-      for (const name of [STORE_BOOKS, STORE_PROGRESS, STORE_OVERRIDES, STORE_BLOBS, STORE_BOOKMARKS]) {
+      for (const name of [
+        STORE_BOOKS,
+        STORE_PROGRESS,
+        STORE_OVERRIDES,
+        STORE_BLOBS,
+        STORE_BOOKMARKS,
+        STORE_LAYOUT,
+      ]) {
         if (!db.objectStoreNames.contains(name)) db.createObjectStore(name, { keyPath: 'id' })
       }
     }

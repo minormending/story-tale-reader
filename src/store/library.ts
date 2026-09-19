@@ -7,6 +7,7 @@ import { ZipArchive, blobSource } from '../engine/zip/reader'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { dirname, resolvePath, mimeTypeFor } from '../engine/path'
 import { primaryImageHref } from '../engine/layout/viewport'
+import type { LayoutMeasurement } from '../engine/epub/load'
 import type {
   BookFormat,
   LayoutMode,
@@ -14,7 +15,16 @@ import type {
   ParsedBook,
   ProgressReporter,
 } from '../engine/types'
-import { STORE_BOOKS, STORE_OVERRIDES, STORE_PROGRESS, get, getAll, put, remove } from './idb'
+import {
+  STORE_BOOKS,
+  STORE_LAYOUT,
+  STORE_OVERRIDES,
+  STORE_PROGRESS,
+  get,
+  getAll,
+  put,
+  remove,
+} from './idb'
 import { deleteBookFile, loadBookFile, requestPersistence, saveBookFile } from './files'
 import { removeBookmarksFor } from './bookmarks'
 
@@ -86,7 +96,8 @@ async function parse(
   blob: Blob,
   fileName: string,
   onProgress?: ProgressReporter,
-): Promise<Omit<OpenedBook, 'entry'>> {
+  cached?: LayoutMeasurement,
+): Promise<Omit<OpenedBook, 'entry'> & { measurement?: LayoutMeasurement }> {
   const format = await detectBlobFormat(blob)
 
   if (format === 'pdf') {
@@ -106,12 +117,38 @@ async function parse(
     throw new Error('This file is not an EPUB, PDF or MOBI book.')
   }
 
-  const { book, archive } = await loadEpub(blobSource(blob), {}, onProgress)
-  return { book, archive }
+  const { book, archive, measurement } = await loadEpub(blobSource(blob), {}, onProgress, cached)
+  return { book, archive, measurement }
 }
 
 function stripExtension(name: string): string {
   return name.replace(/\.[^.]+$/, '') || 'Untitled'
+}
+
+/**
+ * Keep what a book measured, so the next open does not measure it again.
+ *
+ * Best effort in both directions: a shelf that cannot write its cache is slower, not
+ * broken, and a cache that fails to read is simply a measurement that happens again.
+ */
+async function rememberMeasurement(id: string, measurement?: LayoutMeasurement): Promise<void> {
+  // A partial measurement means an override stood in for the real page sizes, and
+  // caching that would answer a question nobody asked.
+  if (!measurement || measurement.viewports.length !== measurement.pageCount) return
+  try {
+    await put(STORE_LAYOUT, { id, ...measurement })
+  } catch {
+    // Storage full or refused; the book still opened.
+  }
+}
+
+async function recallMeasurement(id: string): Promise<LayoutMeasurement | undefined> {
+  try {
+    const row = await get<LayoutMeasurement & { id: string }>(STORE_LAYOUT, id)
+    return row ? { pageCount: row.pageCount, viewportCoverage: row.viewportCoverage, viewports: row.viewports } : undefined
+  } catch {
+    return undefined
+  }
 }
 
 export async function importBook(file: File, onProgress?: ProgressReporter): Promise<OpenedBook> {
@@ -120,7 +157,7 @@ export async function importBook(file: File, onProgress?: ProgressReporter): Pro
   const existing = await get<LibraryEntry>(STORE_BOOKS, id)
 
   // Parse before storing: a book we cannot open should not enter the library.
-  const opened = await parse(file, file.name, onProgress)
+  const opened = await parse(file, file.name, onProgress, await recallMeasurement(id))
 
   // Storing is best effort from here on. The book is parsed and in memory, so a
   // full or restricted quota should cost the reader their shelf entry, not their
@@ -146,6 +183,7 @@ export async function importBook(file: File, onProgress?: ProgressReporter): Pro
     cover: existing?.cover ?? (await makeCover(opened)),
   }
   const listed = await saveEntry(entry)
+  await rememberMeasurement(id, opened.measurement)
   return { entry, ...opened, persisted: stored && listed }
 }
 
@@ -184,9 +222,10 @@ export async function openStoredBook(id: string, onProgress?: ProgressReporter):
     )
   }
 
-  const opened = await parse(blob, entry.fileName, onProgress)
+  const opened = await parse(blob, entry.fileName, onProgress, await recallMeasurement(id))
   const touched: LibraryEntry = { ...entry, lastOpenedAt: Date.now() }
   await saveEntry(touched)
+  await rememberMeasurement(id, opened.measurement)
   return { entry: touched, ...opened, persisted: true }
 }
 
@@ -195,6 +234,7 @@ export async function deleteBook(id: string): Promise<void> {
     remove(STORE_BOOKS, id),
     remove(STORE_PROGRESS, id),
     remove(STORE_OVERRIDES, id),
+    remove(STORE_LAYOUT, id),
     removeBookmarksFor(id),
     deleteBookFile(id),
   ])

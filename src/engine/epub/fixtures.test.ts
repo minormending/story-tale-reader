@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync, existsSync } from 'node:fs'
-import { loadEpub } from './load'
+import { loadEpub, type LayoutMeasurement } from './load'
 import { bufferSource } from '../zip/reader'
 import { buildSpreads } from '../layout/spread'
 import { parseSmil } from '../overlays/smil'
@@ -179,5 +179,49 @@ describe.skipIf(!has('narrated-spreads'))('fixture: narrated spreads', () => {
     expect([lastSpread.left?.overlayPath, lastSpread.right?.overlayPath]).toEqual([
       undefined, undefined,
     ])
+  })
+})
+
+/**
+ * Reusing a previous open's measurement.
+ *
+ * Measuring is the expensive half of opening a fixed-layout book, and it depends on
+ * nothing but the file — whose identity is a hash of its bytes. Doing it once per
+ * book rather than once per open is the difference between a picture book opening
+ * instantly and a tablet appearing to hang.
+ */
+describe.skipIf(!has('fxl-explicit-spreads'))('fixture: reusing a measurement', () => {
+  it('hands back a measurement matching the spine', async () => {
+    const { book, measurement } = await load('fxl-explicit-spreads')
+    expect(measurement.pageCount).toBe(book.pages.length)
+    expect(measurement.viewports).toHaveLength(book.pages.length)
+  })
+
+  it('uses the cached sizes instead of reading the pages again', async () => {
+    const { measurement } = await load('fxl-explicit-spreads')
+
+    // A size the book does not contain. If it comes back out, the pages were not
+    // read this time — which is the whole point of the cache.
+    const invented = { width: 111, height: 222 }
+    const planted: LayoutMeasurement = {
+      ...measurement,
+      viewports: measurement.viewports.map(() => invented),
+    }
+
+    const { book } = await loadEpub(bufferSource(readFileSync(fixture('fxl-explicit-spreads'))), {}, undefined, planted)
+    expect(book.pages.map((page) => page.viewport)).toEqual(book.pages.map(() => invented))
+  })
+
+  it('ignores a measurement taken against a different number of pages', async () => {
+    const { book: first, measurement } = await load('fxl-explicit-spreads')
+    const stale: LayoutMeasurement = {
+      ...measurement,
+      pageCount: measurement.pageCount + 1,
+      viewports: measurement.viewports.map(() => ({ width: 111, height: 222 })),
+    }
+
+    const { book } = await loadEpub(bufferSource(readFileSync(fixture('fxl-explicit-spreads'))), {}, undefined, stale)
+    // Measured afresh, so the real sizes are back.
+    expect(book.pages.map((p) => p.viewport)).toEqual(first.pages.map((p) => p.viewport))
   })
 })

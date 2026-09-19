@@ -42,9 +42,32 @@ function yieldToPaint(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0))
 }
 
+/**
+ * What a previous open measured, and what this one measured.
+ *
+ * Measuring is the expensive half of opening a fixed-layout book: every page
+ * document is read, and a page that declares no size of its own has its main
+ * image's header decoded as well. None of it depends on anything but the file,
+ * whose identity is a hash of its bytes — so the second open never has to repeat it.
+ *
+ * Deliberately the *raw* measurement, before any reader override is applied. An
+ * override can be changed and changed back, and a cache holding the result rather
+ * than the input would have to be invalidated on every such change.
+ */
+export interface LayoutMeasurement {
+  /** Spine length this was measured against, so a mismatch discards it. */
+  pageCount: number
+  /** Share of sampled documents carrying a viewport, for layout detection. */
+  viewportCoverage: number
+  /** Per-page intrinsic sizes, positionally matched to the spine. */
+  viewports: Array<Viewport | undefined>
+}
+
 export interface LoadedEpub {
   book: ParsedBook
   archive: ZipArchive
+  /** Pass back to a later `loadEpub` to skip measuring entirely. */
+  measurement: LayoutMeasurement
   pkg: PackageDocument
   nav: NavDocument
 }
@@ -53,6 +76,7 @@ export async function loadEpub(
   source: ByteSource,
   overrides: LayoutOverrides = {},
   onProgress?: ProgressReporter,
+  cached?: LayoutMeasurement,
 ): Promise<LoadedEpub> {
   const report: ProgressReporter = onProgress ?? (() => {})
 
@@ -87,8 +111,9 @@ export async function loadEpub(
   }
 
   const declaredLayout = pkg.meta.get('rendition:layout')
-  const needsSampling = !declaredLayout && !ibooksFixedLayout
-  let viewportCoverage = 0
+  const usable = cached && cached.pageCount === entries.length ? cached : undefined
+  const needsSampling = !declaredLayout && !ibooksFixedLayout && !usable
+  let viewportCoverage = usable?.viewportCoverage ?? 0
   if (needsSampling) {
     const sample = entries.slice(0, DETECTION_SAMPLE)
     let withViewport = 0
@@ -115,12 +140,13 @@ export async function loadEpub(
     // Only this branch is slow, and only when the book declares no viewport of its
     // own: every page is read, and a page without a viewport meta has its main
     // image's header decoded as well.
-    const measured = !overrides.viewportOverride && !declaredViewport
+    const measured = !overrides.viewportOverride && !declaredViewport && !usable
     report({ stage: 'measuring', done: 0, total: entries.length })
     for (const [index, { item }] of entries.entries()) {
       viewports.push(
         overrides.viewportOverride ??
           declaredViewport ??
+          usable?.viewports[index] ??
           (await resolvePageViewport(archive, item.path)),
       )
       if (!measured) continue
@@ -186,7 +212,19 @@ export async function loadEpub(
     packagePath,
   }
 
-  return { book, archive, pkg, nav }
+  return {
+    book,
+    archive,
+    pkg,
+    nav,
+    // The raw measurement, whether it came from the cache or was taken just now, so
+    // a caller that had nothing to pass in has something to keep.
+    measurement: {
+      pageCount: entries.length,
+      viewportCoverage,
+      viewports: overrides.viewportOverride ? (usable?.viewports ?? []) : viewports,
+    },
+  }
 }
 
 function findLooseOpf(archive: ZipArchive): string | undefined {
