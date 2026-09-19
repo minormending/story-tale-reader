@@ -57,12 +57,19 @@ export function parsePackageDocument(xml: string, packagePath: string): PackageD
   const metadataEl = findFirst(pkg, 'metadata')
   const meta = new Map<string, string>()
   const refines = new Map<string, Map<string, string>>()
+  const collections: Array<{ id?: string; name: string }> = []
 
   if (metadataEl) {
     for (const m of childrenNamed(metadataEl, 'meta')) {
       const property = attr(m, 'property')
       const refinesRef = m.attrs['refines']
       const value = (textContent(m) || attr(m, 'content') || '').trim()
+
+      // A collection is the one property whose own id matters: its type and the
+      // book's position within it arrive as separate metas refining it.
+      if (property === 'belongs-to-collection' && !refinesRef) {
+        collections.push({ id: m.attrs['id'], name: value })
+      }
 
       if (property && refinesRef) {
         const id = refinesRef.replace(/^#/, '')
@@ -146,6 +153,29 @@ export function parsePackageDocument(xml: string, packagePath: string): PackageD
   const ncxPath = ncxId ? manifest.get(ncxId)?.path : undefined
 
   const navItem = [...manifest.values()].find((item) => item.properties.includes('nav'))
+
+  /**
+   * The series this book belongs to, if it says so.
+   *
+   * EPUB 3 states it as a collection refined with a type of "series" and the book's
+   * position within it. Calibre, which is where most people's libraries come from,
+   * predates that and writes EPUB 2 name/content metas instead — so both are read,
+   * with the standard one preferred.
+   */
+  const declared = collections.find(
+    (c) => c.id && refines.get(c.id)?.get('collection-type') === 'series',
+  )
+  const seriesName = declared?.name || meta.get('calibre:series') || undefined
+  const seriesPosition =
+    (declared?.id ? refines.get(declared.id)?.get('group-position') : undefined) ||
+    meta.get('calibre:series_index') ||
+    undefined
+
+  if (seriesName) {
+    metadata.series = seriesName
+    const position = Number.parseFloat(seriesPosition ?? '')
+    if (Number.isFinite(position)) metadata.seriesIndex = position
+  }
 
   return {
     version,

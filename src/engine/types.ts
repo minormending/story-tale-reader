@@ -17,6 +17,10 @@ export interface BookMetadata {
   language?: string
   identifier?: string
   publisher?: string
+  /** Series the book declares itself part of, if any. */
+  series?: string
+  /** Its position within that series, when stated. */
+  seriesIndex?: number
 }
 
 export interface NavItem {

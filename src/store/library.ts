@@ -29,6 +29,9 @@ export interface LibraryEntry {
   lastOpenedAt: number
   pageCount: number
   layout: LayoutMode
+  /** From the book's own metadata, when it declares a series. */
+  series?: string
+  seriesIndex?: number
   hasMediaOverlays: boolean
   cover?: Blob
 }
@@ -137,6 +140,8 @@ export async function importBook(file: File, onProgress?: ProgressReporter): Pro
     lastOpenedAt: Date.now(),
     pageCount: opened.book.pages.length,
     layout: opened.book.layout,
+    series: opened.book.metadata.series,
+    seriesIndex: opened.book.metadata.seriesIndex,
     hasMediaOverlays: opened.book.hasMediaOverlays,
     cover: existing?.cover ?? (await makeCover(opened)),
   }

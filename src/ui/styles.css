@@ -627,3 +627,18 @@ button { font: inherit; cursor: pointer; }
 }
 
 .library-actions { display: flex; align-items: center; gap: 0.5rem; }
+
+/* ----------------------------------------------------------------- series --- */
+
+.series { margin: 0 0 1.4rem; }
+
+.series-name {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  margin: 0 0 0.6rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.series-count { font-size: 0.8rem; font-weight: 400; }

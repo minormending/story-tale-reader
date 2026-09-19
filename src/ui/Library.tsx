@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { BuildTag } from './BuildTag'
 import { filesFromDrop, isBookFile } from './pickFiles'
+import { groupIntoSeries } from '../engine/series'
 import type { LibraryEntry } from '../store/library'
 import { storageEstimate } from '../store/files'
 
@@ -39,6 +40,26 @@ export function Library({
   const folderRef = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+
+  // Series are worked out from the shelf rather than stored, so adding the second
+  // book of a pair groups the first one too, with no re-import.
+  const { groups, loose, byId } = useMemo(() => {
+    const found = groupIntoSeries(
+      entries.map((entry) => ({
+        id: entry.id,
+        title: entry.title,
+        creator: entry.creator,
+        series: entry.series,
+        seriesIndex: entry.seriesIndex,
+      })),
+    )
+    const grouped = new Set(found.flatMap((group) => group.books.map((book) => book.id)))
+    return {
+      groups: found,
+      loose: entries.filter((entry) => !grouped.has(entry.id)),
+      byId: new Map(entries.map((entry) => [entry.id, entry])),
+    }
+  }, [entries])
 
   /**
    * One book opens; several are added to the shelf.
@@ -130,45 +151,54 @@ export function Library({
           <Sample onOpenFile={onOpenFile} busy={busy} />
         </div>
       ) : (
-        <ul className={`shelf${dragging ? ' shelf-dragging' : ''}`}>
-          {entries.map((entry) => (
-            <li key={entry.id} className="shelf-item">
-              <button className="shelf-open" onClick={() => onOpenEntry(entry.id)}>
-                <Cover entry={entry} />
-                <span className="shelf-title">{entry.title}</span>
-                {entry.creator && <span className="shelf-author muted">{entry.creator}</span>}
-                <span className="shelf-badges">
-                  {entry.layout === 'pre-paginated' && <span className="badge">Fixed layout</span>}
-                  {entry.hasMediaOverlays && <span className="badge badge-accent">Read-along</span>}
+        <>
+          {groups.map((group) => (
+            <section className="series" key={`${group.source}-${group.name}`}>
+              <h2 className="series-name">
+                {group.name}
+                <span className="muted series-count">
+                  {group.books.length} books
+                  {/* Said plainly, because a guess the reader cannot see is a guess
+                      they cannot correct. */}
+                  {group.source === 'inferred' && ' · grouped by title'}
                 </span>
-              </button>
-              {confirmDelete === entry.id ? (
-                <div className="shelf-confirm">
-                  <button
-                    className="shelf-remove danger"
-                    onClick={() => {
-                      onDelete(entry.id)
-                      setConfirmDelete(null)
-                    }}
-                  >
-                    Remove
-                  </button>
-                  <button className="shelf-remove" onClick={() => setConfirmDelete(null)}>
-                    Keep
-                  </button>
-                </div>
-              ) : (
-                <button
-                  className="shelf-remove"
-                  onClick={() => setConfirmDelete(entry.id)}
-                  aria-label={`Remove ${entry.title}`}
-                >
-                  Remove
-                </button>
-              )}
-            </li>
+              </h2>
+              <ul className={`shelf${dragging ? ' shelf-dragging' : ''}`}>
+                {group.books.map((book) => {
+                  const entry = byId.get(book.id)
+                  return entry ? (
+                    <ShelfItem
+                      key={entry.id}
+                      entry={entry}
+                      onOpenEntry={onOpenEntry}
+                      onDelete={onDelete}
+                      confirmDelete={confirmDelete}
+                      setConfirmDelete={setConfirmDelete}
+                    />
+                  ) : null
+                })}
+              </ul>
+            </section>
           ))}
-        </ul>
+
+          {loose.length > 0 && (
+            <section className="series">
+              {groups.length > 0 && <h2 className="series-name">Everything else</h2>}
+              <ul className={`shelf${dragging ? ' shelf-dragging' : ''}`}>
+                {loose.map((entry) => (
+                  <ShelfItem
+                    key={entry.id}
+                    entry={entry}
+                    onOpenEntry={onOpenEntry}
+                    onDelete={onDelete}
+                    confirmDelete={confirmDelete}
+                    setConfirmDelete={setConfirmDelete}
+                  />
+                ))}
+              </ul>
+            </section>
+          )}
+        </>
       )}
 
       {entries.length > 0 && !entries.some((entry) => entry.title === SAMPLE.title) && (
@@ -296,5 +326,58 @@ function Sample({
         {SAMPLE.title} &mdash; {SAMPLE.credit}
       </span>
     </div>
+  )
+}
+
+/** One book on the shelf. Extracted so a grouped shelf and a flat one share it. */
+function ShelfItem({
+  entry,
+  onOpenEntry,
+  onDelete,
+  confirmDelete,
+  setConfirmDelete,
+}: {
+  entry: LibraryEntry
+  onOpenEntry: (id: string) => void
+  onDelete: (id: string) => void
+  confirmDelete: string | null
+  setConfirmDelete: (id: string | null) => void
+}) {
+  return (
+    <li className="shelf-item">
+      <button className="shelf-open" onClick={() => onOpenEntry(entry.id)}>
+        <Cover entry={entry} />
+        <span className="shelf-title">{entry.title}</span>
+        {entry.creator && <span className="shelf-author muted">{entry.creator}</span>}
+        <span className="shelf-badges">
+          {entry.layout === 'pre-paginated' && <span className="badge">Fixed layout</span>}
+          {entry.hasMediaOverlays && <span className="badge badge-accent">Read-along</span>}
+        </span>
+      </button>
+      {confirmDelete === entry.id ? (
+        <div className="shelf-confirm">
+          <button
+            className="shelf-remove danger"
+            onClick={() => {
+              onDelete(entry.id)
+              setConfirmDelete(null)
+            }}
+          >
+            Remove
+          </button>
+          <button className="shelf-remove" onClick={() => setConfirmDelete(null)}>
+            Keep
+          </button>
+        </div>
+      ) : (
+        <button
+          className="shelf-remove"
+          onClick={() => setConfirmDelete(entry.id)}
+          aria-label={`Remove ${entry.title}`}
+        >
+          Remove
+        </button>
+      )}
+    </li>
   )
 }
