@@ -168,15 +168,18 @@ export function Library({
       {/* Only worth the room once there is enough on the shelf to lose a book in. */}
       {entries.length > 4 && (
         <div className="shelf-controls">
-          <label className="shelf-search">
-            <span className="visually-hidden">Search your books</span>
-            <input
-              type="search"
-              value={query}
-              placeholder="Search by title, author or series"
-              onChange={(event) => setQuery(event.target.value)}
-            />
-          </label>
+          <input
+            className="shelf-search"
+            type="search"
+            value={query}
+            // Named by the attribute rather than by a visually hidden label. The
+            // hidden-label trick is a line of text in a one-pixel box, which is a
+            // container clipping its own content — indistinguishable, to anything
+            // measuring the page, from text a reader was meant to see and cannot.
+            aria-label="Search your books"
+            placeholder="Search by title, author or series"
+            onChange={(event) => setQuery(event.target.value)}
+          />
           <label className="shelf-sort">
             <span className="muted">Sort</span>
             <select value={sort} onChange={(event) => setSort(event.target.value as ShelfSort)}>

@@ -671,21 +671,6 @@ button { font: inherit; cursor: pointer; }
 
 /* --------------------------------------------------------- shelf controls --- */
 
-/* Present to a screen reader, absent to everyone else. The search field has a
-   placeholder, but a placeholder is not a label: it disappears on the first
-   keystroke and is not reliably announced. */
-.visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  padding: 0;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-  border: 0;
-}
-
 .shelf-controls {
   display: flex;
   align-items: center;
@@ -694,10 +679,9 @@ button { font: inherit; cursor: pointer; }
   margin: 0 0 1rem;
 }
 
-.shelf-search { flex: 1 1 14rem; min-width: 0; }
-
-.shelf-search input {
-  width: 100%;
+.shelf-search {
+  flex: 1 1 14rem;
+  min-width: 0;
   min-height: 44px;
   padding: 0.55rem 0.9rem;
   background: var(--bg-raised);
@@ -707,7 +691,7 @@ button { font: inherit; cursor: pointer; }
   font: inherit;
 }
 
-.shelf-search input::placeholder { color: var(--fg-muted); }
+.shelf-search::placeholder { color: var(--fg-muted); }
 
 .shelf-sort { display: flex; align-items: center; gap: 0.4rem; font-size: 0.9rem; }
 
