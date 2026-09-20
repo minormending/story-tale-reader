@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Library } from './Library'
 import { LoadingBook, type BookLoading } from './LoadingBook'
+import { canPickFolderNatively, pickFolder, type BookSource } from '../native/folderPicker'
 import { Viewer } from './Viewer'
 import { ReflowableViewer } from './ReflowableViewer'
 import { DrmError } from '../engine/epub/ocf'
@@ -107,19 +108,23 @@ export function App() {
    * encrypted, and refusing the whole import over one file would be useless.
    */
   const importMany = useCallback(
-    async (files: File[]) => {
+    async (sources: BookSource[]) => {
       setError(null)
       setNotice(null)
       const failures: string[] = []
 
-      for (const [index, file] of files.entries()) {
-        setBusy(`Adding ${index + 1} of ${files.length}…`)
+      for (const [index, source] of sources.entries()) {
+        setBusy(`Adding ${index + 1} of ${sources.length}…`)
         setLoading({
-          title: file.name,
+          title: source.name,
           progress: { stage: 'reading' },
-          batch: { done: index, total: files.length },
+          batch: { done: index, total: sources.length },
         })
         try {
+          // Fetched here rather than up front: on Android the bytes come across the
+          // bridge one book at a time, and holding a whole folder in memory at once
+          // is what kills a cheap tablet.
+          const file = await source.load()
           // Nothing here is about to be rendered, so the pages need not be measured:
           // the entry only wants a title, an author, a count and a cover. Whichever
           // of these the reader opens first will measure it then, and keep it.
@@ -127,7 +132,7 @@ export function App() {
             measure: false,
           })
         } catch (cause) {
-          failures.push(`${file.name}: ${cause instanceof Error ? cause.message : String(cause)}`)
+          failures.push(`${source.name}: ${cause instanceof Error ? cause.message : String(cause)}`)
         }
       }
 
@@ -135,20 +140,36 @@ export function App() {
       setLoading(null)
       setEntries(await listLibrary())
 
-      const added = files.length - failures.length
+      const added = sources.length - failures.length
       if (failures.length === 0) {
         setNotice(`Added ${added} ${added === 1 ? 'book' : 'books'}.`)
       } else {
         // Named, not counted: "3 books could not be added" leaves the reader to work
         // out which, from a shelf they have not seen before.
         setNotice(
-          `Added ${added} of ${files.length}. These could not be opened — ` +
+          `Added ${added} of ${sources.length}. These could not be opened — ` +
             failures.join('; '),
         )
       }
     },
     [],
   )
+
+  /** Android only: choose a real folder, then import what is in it. */
+  const importFolder = useCallback(async () => {
+    setError(null)
+    const sources = await pickFolder().catch((cause) => {
+      setError(cause instanceof Error ? cause.message : String(cause))
+      return undefined
+    })
+    // Backed out of the picker, or the platform has no picker to back out of.
+    if (!sources) return
+    if (sources.length === 0) {
+      setNotice('No books in that folder.')
+      return
+    }
+    await importMany(sources)
+  }, [importMany])
 
   const openEntry = useCallback(
     async (id: string) => {
@@ -249,7 +270,8 @@ export function App() {
       <Library
       entries={entries}
       onOpenFile={(file) => void openFile(file)}
-      onImportMany={(files) => void importMany(files)}
+      onImportMany={(sources) => void importMany(sources)}
+      onPickFolder={canPickFolderNatively() ? () => void importFolder() : undefined}
       onOpenEntry={(id) => void openEntry(id)}
       onDelete={(id) => void remove(id)}
       busy={busy}

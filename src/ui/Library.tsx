@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { BuildTag } from './BuildTag'
 import { canPickDirectory, filesFromDrop, isBookFile } from './pickFiles'
+import type { BookSource } from '../native/folderPicker'
 import { groupIntoSeries } from '../engine/series'
 import { SORT_LABELS, matchesQuery, sortShelf, type ShelfSort } from './shelf'
 import type { LibraryEntry } from '../store/library'
@@ -24,6 +25,7 @@ export function Library({
   onOpenEntry,
   onDelete,
   onImportMany,
+  onPickFolder,
   busy,
   error,
   notice,
@@ -32,7 +34,9 @@ export function Library({
   onOpenFile: (file: File) => void
   onOpenEntry: (id: string) => void
   onDelete: (id: string) => void
-  onImportMany: (files: File[]) => void
+  onImportMany: (sources: BookSource[]) => void
+  /** Android only: a real folder chooser, which the browser cannot offer. */
+  onPickFolder?: () => void
   busy: string | null
   error: string | null
   notice: string | null
@@ -98,7 +102,9 @@ export function Library({
     const books = files.filter(isBookFile)
     if (books.length === 0) return
     if (books.length === 1 && books[0]) onOpenFile(books[0])
-    else onImportMany(books)
+    // Already in hand, so each "source" simply hands its file back. The indirection
+    // is for Android, where the bytes are fetched one book at a time.
+    else onImportMany(books.map((file) => ({ name: file.name, load: async () => file })))
   }
 
   return (
@@ -132,19 +138,23 @@ export function Library({
           </button>
           <button
             className="secondary"
-            // Where folders cannot be chosen, offer what can: the same picker, with
-            // several books selected at once. Naming it honestly matters more than
-            // keeping the nicer label — a button that opens the wrong dialog reads
-            // as a broken app, not as a missing platform feature.
-            onClick={() => (foldersWork ? folderRef : inputRef).current?.click()}
+            // Three ways down, in order of how much they give the reader: a real
+            // folder through Android's own picker, a folder through the browser, or
+            // — where neither exists — several files at once, named honestly,
+            // because a button that opens the wrong dialog reads as a broken app
+            // rather than as a missing platform feature.
+            onClick={() => {
+              if (onPickFolder) onPickFolder()
+              else (foldersWork ? folderRef : inputRef).current?.click()
+            }}
             disabled={!!busy}
             title={
-              foldersWork
+              onPickFolder || foldersWork
                 ? 'Add every book in a folder'
                 : 'Choose several books at once — this device cannot pick a whole folder'
             }
           >
-            {foldersWork ? 'Add a folder' : 'Add several'}
+            {onPickFolder || foldersWork ? 'Add a folder' : 'Add several'}
           </button>
         </div>
         <input
