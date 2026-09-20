@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { BuildTag } from './BuildTag'
-import { filesFromDrop, isBookFile } from './pickFiles'
+import { canPickDirectory, filesFromDrop, isBookFile } from './pickFiles'
 import { groupIntoSeries } from '../engine/series'
 import { SORT_LABELS, matchesQuery, sortShelf, type ShelfSort } from './shelf'
 import type { LibraryEntry } from '../store/library'
@@ -42,6 +42,9 @@ export function Library({
   const [dragging, setDragging] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const [query, setQuery] = useState('')
+  // Asked once: it cannot change while the page is open, and asking per render
+  // would mean building a throwaway input on every keystroke in the search box.
+  const [foldersWork] = useState(canPickDirectory)
   const [sort, setSort] = useState<ShelfSort>('recent')
 
   // Series are worked out from the shelf rather than stored, so adding the second
@@ -129,11 +132,19 @@ export function Library({
           </button>
           <button
             className="secondary"
-            onClick={() => folderRef.current?.click()}
+            // Where folders cannot be chosen, offer what can: the same picker, with
+            // several books selected at once. Naming it honestly matters more than
+            // keeping the nicer label — a button that opens the wrong dialog reads
+            // as a broken app, not as a missing platform feature.
+            onClick={() => (foldersWork ? folderRef : inputRef).current?.click()}
             disabled={!!busy}
-            title="Add every book in a folder"
+            title={
+              foldersWork
+                ? 'Add every book in a folder'
+                : 'Choose several books at once — this device cannot pick a whole folder'
+            }
           >
-            Add a folder
+            {foldersWork ? 'Add a folder' : 'Add several'}
           </button>
         </div>
         <input
@@ -147,19 +158,21 @@ export function Library({
             event.target.value = ''
           }}
         />
-        <input
-          ref={folderRef}
-          type="file"
-          // Not in the HTML standard, but the only thing every engine agrees on for
-          // picking a directory. React needs it lowercase in JSX.
-          {...{ webkitdirectory: '' }}
-          multiple
-          hidden
-          onChange={(event) => {
-            take(Array.from(event.target.files ?? []))
-            event.target.value = ''
-          }}
-        />
+        {foldersWork && (
+          <input
+            ref={folderRef}
+            type="file"
+            // Not in the HTML standard, but the only thing the engines that support
+            // directory picking agree on. React needs it lowercase in JSX.
+            {...{ webkitdirectory: '' }}
+            multiple
+            hidden
+            onChange={(event) => {
+              take(Array.from(event.target.files ?? []))
+              event.target.value = ''
+            }}
+          />
+        )}
       </header>
 
       {error && <p className="banner banner-error">{error}</p>}

@@ -60,3 +60,33 @@ async function collect(entry: FileSystemEntry, out: File[]): Promise<void> {
     for (const child of batch) await collect(child, out)
   }
 }
+
+/**
+ * Whether this browser can actually let someone choose a directory.
+ *
+ * Chrome for Android and Safari on iOS both ignore `webkitdirectory` and open an
+ * ordinary file picker instead, so a button offering a folder there is a button
+ * that lies — which is exactly what it did: "select a folder on Android does not
+ * work, it prompts the user to select a file instead."
+ *
+ * The attribute cannot be asked. It is present in the IDL on mobile Chromium, and
+ * setting it succeeds; only the picker declines to honour it, and it does so at the
+ * point a person is looking at the wrong dialog. Nothing about the DOM reveals that
+ * beforehand, so this asks what platform it is on — a last resort, used because
+ * there is no first one.
+ */
+export function canPickDirectory(): boolean {
+  if (typeof document === 'undefined' || typeof navigator === 'undefined') return false
+  if (!('webkitdirectory' in document.createElement('input'))) return false
+
+  // Chromium states it outright; everything else has to be read off the UA string.
+  const hints = (navigator as Navigator & { userAgentData?: { mobile?: boolean } }).userAgentData
+  if (typeof hints?.mobile === 'boolean') return !hints.mobile
+
+  // iPadOS reports itself as a Mac, so a touch-capable "Mac" is an iPad.
+  const ua = navigator.userAgent
+  if (/Android|iPhone|iPod/i.test(ua)) return false
+  if (/iPad/i.test(ua)) return false
+  if (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1) return false
+  return true
+}

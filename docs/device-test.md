@@ -140,6 +140,11 @@ differently. Worth real fingers.
       → The pairing corrects, and the label reads *shifted*.
 - [ ] Contents (new in v0.4.0): open the menu, press an entry. → Goes there, and the
       entry is marked when you reopen the menu.
+- [ ] The second button on the library reads **"Add several"**, not "Add a folder".
+      → Pressing it opens the ordinary file picker with multi-selection. Android
+      cannot choose a directory at all, so a folder button there would open the
+      wrong dialog; picking several books is the whole of what the platform offers.
+      Select three or four at once and check they all arrive.
 
 ## 7. Storage and offline
 
