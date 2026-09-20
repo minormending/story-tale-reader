@@ -586,11 +586,18 @@ Visual correctness is the entire product, so the test strategy is weighted towar
   been exercised running.
 - ~~**Bookmarks**~~ **Built.** A toggle in the reader's toolbar and a list in its
   menu; removing a book takes its bookmarks with it.
-- **Pinch-zoom and lock mode are verified with a mouse and synthetic pointer
-  events, not a touchscreen.** Touch differs in ways that matter here — it captures
-  a pointer to its original target, and the browser arbitrates multi-touch
-  differently — so the two-finger pinch path in particular is unproven on a real
-  device. The wake lock could only be observed failing with `NotAllowedError: the
+- **Pinch-zoom and lock mode are exercised by emulated touch, not by a real
+  touchscreen.** The UI audit now drives them with touch events the browser itself
+  dispatches — including a genuine two-finger pinch over CDP, which is the only way
+  two simultaneous contacts can be produced without a hand — in a Chromium-with-touch
+  project, since the tablet and phone projects run WebKit and Chromium is what an
+  Android WebView is. A pinch is confirmed to zoom the spread and a tap to lock the
+  reader, in both engines for the tap.
+
+  That narrows the gap rather than closing it. Emulated touch is still the browser
+  deciding what a finger would have done: it does not reproduce how a real digitiser
+  reports contacts, how the OS arbitrates a second finger arriving late, or palm
+  rejection. The two-finger path remains unproven on a real device. The wake lock could only be observed failing with `NotAllowedError: the
   requesting page is not visible`, which is the expected result for a hidden page
   and the exact case the hook re-acquires from; it has not been seen holding.
 - **CFI** position tracking was specified for reflowable books (§5.5), and
