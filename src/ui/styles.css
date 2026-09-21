@@ -226,6 +226,16 @@ button { font: inherit; cursor: pointer; }
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
+  /*
+   * The menu is positioned from the top of a viewer that does not scroll, so
+   * anything past the bottom edge was simply unreachable — no scrollbar, nothing to
+   * drag. It grew a group and fell off a 600px-tall screen, which is a phone in
+   * landscape as much as it is a CI viewport.
+   */
+  max-height: calc(100dvh - env(safe-area-inset-top) - 5rem);
+  overflow-y: auto;
+  /* Scrolling the menu must not start scrolling whatever is behind it. */
+  overscroll-behavior: contain;
 }
 .menu-note { margin: 0; font-size: 0.8rem; color: var(--fg-muted); }
 .menu-item {
