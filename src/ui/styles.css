@@ -11,23 +11,30 @@
  * ever drawn over a page.
  */
 :root {
-  --bg: #1b1733;
+  /* Light by default, because most devices are, and because dark text on a light
+     background measurably reads better — smaller pupils, higher acuity. The reader
+     stage is the exception and stays near-black in both, below. */
+  --bg: #f7f5ff;
+  --bg-raised: #ffffff;
   --stage: #0d0c11;
-  --bg-raised: #272146;
-  --fg: #f4f1fb;
-  --fg-muted: #b3abd4;
+  --fg: #1e1a33;
+  --fg-muted: #5a527e;
   --accent: #ffb454;
   --accent-ink: #2a1c05;
-  --danger: #ff8080;
-  --line: #3b3363;
+  --danger: #b3261e;
+  --line: #ded8f2;
+  --hover: rgba(30, 26, 51, 0.07);
+  --hover-strong: rgba(30, 26, 51, 0.11);
+  --sunken: rgba(30, 26, 51, 0.05);
+  --card: #ffffff;
+  --scrim: rgba(20, 18, 34, 0.55);
+  --shadow: rgba(58, 48, 96, 0.22);
+  --shadow-deep: rgba(58, 48, 96, 0.3);
   --radius: 14px;
 
-  /*
-   * A small, fixed set of friendly hues, assigned by content rather than at random
-   * so a book keeps its colour between sessions. Each is dark enough to carry
-   * --accent-ink text at AA contrast, because a cheerful button nobody can read is
-   * not an improvement.
-   */
+  /* The six friendly hues are tile backgrounds carrying dark ink, so they work on
+     either scheme — and staying identical is the point: a child looking for "the
+     orange one" should find the same orange whatever the device is set to. */
   --hue-1: #ff9f6b;
   --hue-2: #7fd1c1;
   --hue-3: #9db8ff;
@@ -35,8 +42,66 @@
   --hue-5: #ffd166;
   --hue-6: #b8e986;
 
+  /* Badges are text on a tint, so they need a readable pair per scheme. */
+  --badge-bg: rgba(74, 106, 214, 0.14);
+  --badge-fg: #38489c;
+  --badge-accent-bg: rgba(176, 116, 12, 0.18);
+  --badge-accent-fg: #6b3d00;
+
+  color-scheme: light dark;
+}
+
+/* The same interface after dark. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1b1733;
+    --bg-raised: #272146;
+    --fg: #f4f1fb;
+    --fg-muted: #b3abd4;
+    --danger: #ff8080;
+    --line: #3b3363;
+    --hover: rgba(255, 255, 255, 0.07);
+    --hover-strong: rgba(255, 255, 255, 0.11);
+    --sunken: rgba(255, 255, 255, 0.05);
+    --card: #16161d;
+    --scrim: rgba(10, 10, 14, 0.72);
+    --shadow: rgba(0, 0, 0, 0.5);
+    --shadow-deep: rgba(0, 0, 0, 0.55);
+    --badge-bg: rgba(157, 184, 255, 0.18);
+    --badge-fg: #9db8ff;
+    --badge-accent-bg: rgba(255, 209, 102, 0.2);
+    --badge-accent-fg: #ffd166;
+  }
+}
+
+/*
+ * The reader is dark whatever the device is set to.
+ *
+ * It surrounds an illustration, and a gallery does not light its walls to match the
+ * weather. Redeclaring the tokens here rather than hardcoding colours means every
+ * control inside the viewer — menu, chrome, bookmarks, contents — follows without
+ * knowing anything about schemes.
+ */
+.viewer {
+  --bg: #15141a;
+  --bg-raised: #272146;
+  --fg: #f4f1fb;
+  --fg-muted: #b3abd4;
+  --danger: #ff8080;
+  --line: #3b3363;
+  --hover: rgba(255, 255, 255, 0.07);
+  --hover-strong: rgba(255, 255, 255, 0.11);
+  --sunken: rgba(255, 255, 255, 0.05);
+  --card: #16161d;
+  --shadow: rgba(0, 0, 0, 0.5);
+  --shadow-deep: rgba(0, 0, 0, 0.55);
+  --badge-bg: rgba(157, 184, 255, 0.18);
+  --badge-fg: #9db8ff;
+  --badge-accent-bg: rgba(255, 209, 102, 0.2);
+  --badge-accent-fg: #ffd166;
   color-scheme: dark;
 }
+
 
 * { box-sizing: border-box; }
 
@@ -122,7 +187,7 @@ button { font: inherit; cursor: pointer; }
 }
 
 .secondary:disabled { color: var(--fg-muted); opacity: 0.45; cursor: default; }
-.secondary:not(:disabled):hover { background: rgba(255, 255, 255, 0.07); border-color: var(--fg-muted); }
+.secondary:not(:disabled):hover { background: var(--hover); border-color: var(--fg-muted); }
 
 .banner { border-radius: 10px; padding: 0.75rem 1rem; margin: 0; font-size: 0.95rem; }
 .banner-warn { background: rgba(255, 180, 84, 0.12); color: var(--accent); }
@@ -144,7 +209,7 @@ button { font: inherit; cursor: pointer; }
 .spread {
   display: flex;
   justify-content: center;
-  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.55);
+  box-shadow: 0 12px 48px var(--shadow-deep);
 }
 
 /* The slot is the scaled footprint; the iframe inside keeps its intrinsic size. */
@@ -209,7 +274,7 @@ button { font: inherit; cursor: pointer; }
   white-space: nowrap;
 }
 .icon-button:disabled { color: var(--fg-muted); opacity: 0.4; cursor: default; }
-.icon-button:not(:disabled):hover { background: rgba(255, 255, 255, 0.07); }
+.icon-button:not(:disabled):hover { background: var(--hover); }
 
 /* ------------------------------ fix menu ------------------------------ */
 
@@ -222,7 +287,7 @@ button { font: inherit; cursor: pointer; }
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 0.85rem;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 16px 40px var(--shadow);
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
@@ -244,7 +309,7 @@ button { font: inherit; cursor: pointer; }
   align-items: center;
   gap: 0.75rem;
   width: 100%;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--sunken);
   color: var(--fg);
   border: 0;
   border-radius: 10px;
@@ -252,13 +317,13 @@ button { font: inherit; cursor: pointer; }
   min-height: 48px;
   text-align: left;
 }
-.menu-item:hover { background: rgba(255, 255, 255, 0.09); }
+.menu-item:hover { background: var(--hover-strong); }
 .menu-hint { margin: 0; font-size: 0.8rem; color: var(--fg-muted); }
 .menu-row { display: flex; gap: 0.4rem; }
 
 .chip {
   flex: 1;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--sunken);
   color: var(--fg);
   border: 1px solid transparent;
   border-radius: 999px;
@@ -314,7 +379,7 @@ button { font: inherit; cursor: pointer; }
   /* Rounder and lifted: a cover should read as an object to pick up. */
   border-radius: 12px;
   background: var(--bg-raised);
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 8px 22px var(--shadow);
   transition: transform 0.12s ease-out;
 }
 
@@ -364,10 +429,10 @@ button { font: inherit; cursor: pointer; }
   font-weight: 600;
   border-radius: 999px;
   padding: 0.18rem 0.55rem;
-  background: rgba(157, 184, 255, 0.18);
-  color: var(--hue-3);
+  background: var(--badge-bg);
+  color: var(--badge-fg);
 }
-.badge-accent { background: rgba(255, 209, 102, 0.2); color: var(--hue-5); }
+.badge-accent { background: var(--badge-accent-bg); color: var(--badge-accent-fg); }
 
 .shelf-confirm { display: flex; gap: 0.35rem; }
 .shelf-remove {
@@ -379,7 +444,7 @@ button { font: inherit; cursor: pointer; }
   font-size: 0.8rem;
   align-self: flex-start;
 }
-.shelf-remove:hover { background: rgba(255, 255, 255, 0.07); color: var(--fg); }
+.shelf-remove:hover { background: var(--hover); color: var(--fg); }
 .shelf-remove.danger { color: var(--danger); }
 
 
@@ -474,7 +539,7 @@ button { font: inherit; cursor: pointer; }
   align-items: center;
   min-height: 44px;
   padding: 0.2rem 0.7rem;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--sunken);
   border: 1px solid var(--line);
   border-radius: 8px;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -499,7 +564,7 @@ button { font: inherit; cursor: pointer; }
   height: 44px;
   border: 1px solid var(--line);
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--sunken);
   font-size: 1.05rem;
   line-height: 1;
   flex-shrink: 0;
@@ -540,7 +605,7 @@ button { font: inherit; cursor: pointer; }
   line-height: 1;
   flex-shrink: 0;
 }
-.bookmark:hover { background: rgba(255, 255, 255, 0.07); color: var(--fg); }
+.bookmark:hover { background: var(--hover); color: var(--fg); }
 .bookmark-on { color: var(--accent); border-color: var(--line); }
 
 .bookmark-list {
@@ -563,13 +628,13 @@ button { font: inherit; cursor: pointer; }
   min-width: 0;
   min-height: 44px;
   padding: 0.45rem 0.6rem;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--sunken);
   border: 0;
   border-radius: 8px;
   color: var(--fg);
   text-align: left;
 }
-.bookmark-jump:hover { background: rgba(255, 255, 255, 0.09); }
+.bookmark-jump:hover { background: var(--hover-strong); }
 .bookmark-label { font-size: 0.9rem; font-weight: 600; }
 .bookmark-excerpt {
   font-size: 0.78rem;
@@ -588,7 +653,7 @@ button { font: inherit; cursor: pointer; }
   padding: 0 0.5rem;
   flex-shrink: 0;
 }
-.bookmark-remove:hover { background: rgba(255, 255, 255, 0.07); color: var(--danger); }
+.bookmark-remove:hover { background: var(--hover); color: var(--danger); }
 
 /* Table of contents. Sized and spaced like the bookmark list it sits above, and
    capped the same way: a novel's contents would otherwise push the rest of the
@@ -609,7 +674,7 @@ button { font: inherit; cursor: pointer; }
   min-height: 44px;
   padding: 0.45rem 0.6rem;
   text-align: left;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--sunken);
   border: 0;
   border-radius: 8px;
   color: inherit;
@@ -618,7 +683,7 @@ button { font: inherit; cursor: pointer; }
   cursor: pointer;
 }
 
-.contents-jump:hover { background: rgba(255, 255, 255, 0.09); }
+.contents-jump:hover { background: var(--hover-strong); }
 
 /* Where the reader is now. A left edge rather than a fill: the entry still has to
    read as a button you can press, not as one that is disabled or already used. */
@@ -637,15 +702,15 @@ button { font: inherit; cursor: pointer; }
   align-items: center;
   justify-content: center;
   padding: 1rem;
-  background: rgba(10, 10, 14, 0.72);
+  background: var(--scrim);
 }
 
 .loading-card {
   width: min(26rem, 100%);
   padding: 1.25rem;
   border-radius: 14px;
-  background: #16161d;
-  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5);
+  background: var(--card);
+  box-shadow: 0 18px 50px var(--shadow);
 }
 
 .loading-book {
@@ -659,7 +724,7 @@ button { font: inherit; cursor: pointer; }
 .loading-track {
   height: 8px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--sunken);
   overflow: hidden;
 }
 
@@ -822,7 +887,7 @@ button { font: inherit; cursor: pointer; }
   cursor: pointer;
 }
 
-.replay:not(:disabled):hover { background: rgba(255, 255, 255, 0.07); }
+.replay:not(:disabled):hover { background: var(--hover); }
 
 /* In a child's hands it is the same size as everything else they can press. */
 .viewer-locked .replay { width: 76px; height: 76px; font-size: 1.5rem; }
