@@ -11,6 +11,17 @@ export interface Typography {
   theme: ReaderTheme
   /** Page margin in CSS pixels. */
   margin: number
+  /**
+   * Space added between letters, in em.
+   *
+   * The one typographic setting here with a measured effect behind it: extra
+   * inter-letter spacing let dyslexic children read about 10% faster with roughly
+   * half the errors (Zorzi et al. 2012). Whether that is specific to dyslexia is
+   * argued over; that it helps children who read poorly is not.
+   */
+  letterSpacing: number
+  /** Space added between words, in em. Same study, same reasoning. */
+  wordSpacing: number
 }
 
 export const DEFAULT_TYPOGRAPHY: Typography = {
@@ -19,6 +30,10 @@ export const DEFAULT_TYPOGRAPHY: Typography = {
   font: 'publisher',
   theme: 'publisher',
   margin: 36,
+  // Off by default: the publisher's spacing is the one the book was designed with,
+  // and widening it for a child who does not need it is a change for its own sake.
+  letterSpacing: 0,
+  wordSpacing: 0,
 }
 
 const THEMES: Record<Exclude<ReaderTheme, 'publisher'>, { bg: string; fg: string; link: string }> = {
@@ -51,7 +66,7 @@ export function reflowableStyles(
   frame: { width: number; height: number },
   typography: Typography,
 ): string {
-  const { margin, fontScale, lineHeight, font, theme } = typography
+  const { margin, fontScale, lineHeight, font, theme, letterSpacing, wordSpacing } = typography
   const fontSize = Math.round(16 * fontScale)
   const columnWidth = Math.max(
     Math.min(frame.width - margin * 2, fontSize * MAX_MEASURE_EM),
@@ -80,6 +95,8 @@ export function reflowableStyles(
       column-fill: auto !important;
       font-size: ${fontSize}px !important;
       line-height: ${lineHeight} !important;
+      ${letterSpacing ? `letter-spacing: ${letterSpacing}em !important;` : ''}
+      ${wordSpacing ? `word-spacing: ${wordSpacing}em !important;` : ''}
       ${stack ? `font-family: ${stack} !important;` : ''}
       ${palette ? `background: ${palette.bg} !important; color: ${palette.fg} !important;` : ''}
     }
@@ -90,6 +107,14 @@ export function reflowableStyles(
         : ''
     }
     ${stack ? 'body *:not(code):not(pre) { font-family: inherit !important; }' : ''}
+    ${
+      letterSpacing || wordSpacing
+        ? `body *:not(code):not(pre) {
+             ${letterSpacing ? `letter-spacing: ${letterSpacing}em !important;` : ''}
+             ${wordSpacing ? `word-spacing: ${wordSpacing}em !important;` : ''}
+           }`
+        : ''
+    }
     /* Keep figures inside one column instead of forcing a blank page. */
     img, svg, video {
       max-width: 100% !important;

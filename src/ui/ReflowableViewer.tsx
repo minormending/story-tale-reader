@@ -418,6 +418,29 @@ export function ReflowableViewer({
               </button>
             ))}
           </div>
+
+          <p className="menu-note">Letter spacing</p>
+          <div className="menu-row">
+            {/* Both settings move together under one control: the reading studies
+                widened letters and words at the same time, and asking a parent to
+                tune two typographic measurements separately is asking the wrong
+                person the wrong question. */}
+            {([0, 0.06, 0.12] as const).map((value) => (
+              <button
+                key={value}
+                className={`chip${typography.letterSpacing === value ? ' chip-on' : ''}`}
+                onClick={() => {
+                  set('letterSpacing', value)
+                  setTypography((current) => ({ ...current, wordSpacing: value * 1.5 }))
+                }}
+              >
+                {value === 0 ? 'Normal' : value === 0.06 ? 'Wider' : 'Widest'}
+              </button>
+            ))}
+          </div>
+          <p className="menu-hint">
+            Extra space between letters helps some children read more accurately.
+          </p>
         </div>
       )}
 
