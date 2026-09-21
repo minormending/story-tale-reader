@@ -353,6 +353,15 @@ one iframe for the whole spine item, column-width = frame width. Settings for fo
 size, family, line height, margins, and theme (light/sepia/dark). CFI-based position
 tracking so bookmarks survive a font-size change.
 
+**Letter spacing** is also offered, and is the one typographic setting here with a
+measured effect behind it: extra inter-letter spacing let dyslexic children read
+about 10% faster with roughly half the errors (Zorzi et al. 2012). Letter and word
+spacing move together under one control, since the studies widened both and a parent
+should not have to tune two typographic measurements. A dyslexia-branded font is
+deliberately **not** offered — the best-known one showed no effect on rate or
+accuracy and no child preferring it (Wery & Diliberto 2017). See
+docs/child-reading-research.md.
+
 ---
 
 ## 6. Reader UX
@@ -392,6 +401,12 @@ empty shelf. **Sourcing that sample is an open item — see §13.**
   whichever screen that element now falls on, by the same arithmetic bookmarks use
   (§5.5), so it survives a change of type size; a fixed page has no interior to
   scroll to, so the entry's page is the whole of what it can mean there.
+- The controls a **locked** reader can press are sized for a child: 76px, about 2cm,
+  against the 44px adult minimum used everywhere else. **Built.** Guidance for young
+  children is roughly four times the adult target because fine motor control is
+  still developing; lock mode is by definition the moment a child is holding the
+  tablet. Only the padlock, the page turns and the replay grow — nothing else is
+  reachable while locked. See docs/child-reading-research.md.
 - Pinch to zoom up to 4×, pan while zoomed, tap to reset. **Built**, with two
   deviations: the whole spread zooms rather than one page, so a detail crossing the
   gutter stays whole and panning works across both halves; and a *single* tap
@@ -467,6 +482,9 @@ injected default highlight.
 - At a page's last `par` end: pause and hold, or auto-turn and continue, per setting.
 - **Tap a word** → look up its `par` → `audio.currentTime = clipBegin` → play. This is the feature that makes kids re-listen to a word they didn't catch.
 - Controls: play/pause, 0.75× / 1× / 1.25× rate (`preservesPitch = true`), auto-advance toggle, highlight on/off.
+- **Replay the spread.** **Built.** Repetition is how a young child uses a picture
+  book, and without a control for it the only options are turning back and forth or
+  tapping the first word. Restarts the spread on screen, not the book.
 
 ### 7.3 Clock values
 
