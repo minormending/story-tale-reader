@@ -134,7 +134,7 @@ export function Library({
         </div>
         <div className="library-actions">
           <button className="primary" onClick={() => inputRef.current?.click()} disabled={!!busy}>
-            {busy ? 'Opening…' : 'Add a book'}
+            {busy ? 'Opening…' : <><span aria-hidden="true">＋</span> Add a book</>}
           </button>
           <button
             className="secondary"
@@ -154,6 +154,7 @@ export function Library({
                 : 'Choose several books at once — this device cannot pick a whole folder'
             }
           >
+            <span aria-hidden="true">🗂</span>{' '}
             {onPickFolder || foldersWork ? 'Add a folder' : 'Add several'}
           </button>
         </div>
@@ -303,6 +304,19 @@ export function Library({
   )
 }
 
+/**
+ * Which of the six friendly colours a coverless book gets.
+ *
+ * Derived from the title so it never changes between sessions: a child who cannot
+ * read the spine yet can still be looking for "the orange one", and that only works
+ * if it is orange every time.
+ */
+function hueFor(title: string): number {
+  let sum = 0
+  for (let i = 0; i < title.length; i++) sum = (sum + title.charCodeAt(i)) % 3600
+  return (sum % 6) + 1
+}
+
 function Cover({ entry }: { entry: LibraryEntry }) {
   const [url, setUrl] = useState<string | null>(null)
 
@@ -313,7 +327,13 @@ function Cover({ entry }: { entry: LibraryEntry }) {
     return () => URL.revokeObjectURL(objectUrl)
   }, [entry.cover])
 
-  if (!url) return <span className="shelf-cover shelf-cover-blank">{entry.title.slice(0, 1)}</span>
+  if (!url) {
+    return (
+      <span className="shelf-cover shelf-cover-blank" data-hue={hueFor(entry.title)}>
+        {entry.title.slice(0, 1)}
+      </span>
+    )
+  }
   return <img className="shelf-cover" src={url} alt="" loading="lazy" />
 }
 
