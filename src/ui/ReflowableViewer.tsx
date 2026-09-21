@@ -304,7 +304,9 @@ export function ReflowableViewer({
     setTypography((current) => ({ ...current, [key]: value }))
 
   return (
-    <div className="viewer viewer-reflow">
+    // Locked means a child is holding this, so the controls that remain grow to
+    // suit smaller hands — see docs/child-reading-research.md.
+    <div className={`viewer viewer-reflow${locked ? ' viewer-locked' : ''}`}>
       <main className="stage" ref={stageRef} {...gestures.stageProps}>
         {section && frame.width > 0 && (
           <ReflowableStage

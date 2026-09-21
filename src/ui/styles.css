@@ -717,3 +717,32 @@ button { font: inherit; cursor: pointer; }
   text-decoration: underline;
   cursor: pointer;
 }
+
+/* ------------------------------------------------------- locked for a child --- */
+
+/*
+ * Lock mode means a tablet is in a child's hands, so the controls that survive it
+ * are sized for those hands.
+ *
+ * Guidance for young children is around a 2cm target — roughly four times the adult
+ * minimum — because fine motor control is still developing and miss rates are much
+ * higher (NN/g; Soni et al. 2019). 44px is the *adult* floor and is what the rest of
+ * this interface uses. 76px is about 2cm at 96dpi.
+ *
+ * Only the controls a locked reader can actually press grow: the padlock, which is
+ * the way out, and the page turns. Nothing else is on screen to compete with them.
+ */
+.viewer-locked .chrome-bottom button,
+.viewer-locked .lock {
+  min-height: 76px;
+  min-width: 76px;
+  font-size: 1.05rem;
+}
+
+.viewer-locked .lock { border-radius: 16px; }
+
+/* The bar has to make room, or the bigger buttons are clipped by the old height. */
+.viewer-locked .chrome-bottom { padding-top: 0.35rem; padding-bottom: 0.35rem; }
+
+/* A child pressing near a control should not select the page text instead. */
+.viewer-locked .chrome button { user-select: none; }

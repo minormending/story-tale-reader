@@ -239,7 +239,9 @@ export function Viewer({
   const shift = overrides.spreadShift ?? 0
 
   return (
-    <div className="viewer">
+    // Locked means a child is holding this, so the controls that remain grow to
+    // suit smaller hands — see docs/child-reading-research.md.
+    <div className={`viewer${locked ? ' viewer-locked' : ''}`}>
       <main className="stage" ref={stageRef} {...gestures.stageProps}>
         {spread && (
           <div
