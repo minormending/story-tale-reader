@@ -746,3 +746,21 @@ button { font: inherit; cursor: pointer; }
 
 /* A child pressing near a control should not select the page text instead. */
 .viewer-locked .chrome button { user-select: none; }
+
+/* Hear the page again. Secondary to play, which is the control being repeated. */
+.replay {
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--fg);
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.replay:not(:disabled):hover { background: rgba(255, 255, 255, 0.07); }
+
+/* In a child's hands it is the same size as everything else they can press. */
+.viewer-locked .replay { width: 76px; height: 76px; font-size: 1.5rem; }

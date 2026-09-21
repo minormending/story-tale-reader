@@ -418,13 +418,26 @@ export function Viewer({
         </button>
         <div className="chrome-centre">
           {readAlong.available && (
-            <button
-              className={`play${readAlong.playing ? ' play-on' : ''}`}
-              onClick={readAlong.toggle}
-              aria-label={readAlong.playing ? 'Pause read-along' : 'Play read-along'}
-            >
-              {readAlong.playing ? '\u23f8' : '\u25b6'}
-            </button>
+            <>
+              <button
+                className={`play${readAlong.playing ? ' play-on' : ''}`}
+                onClick={readAlong.toggle}
+                aria-label={readAlong.playing ? 'Pause read-along' : 'Play read-along'}
+              >
+                {readAlong.playing ? '\u23f8' : '\u25b6'}
+              </button>
+              {/* Repetition is how a young child uses a picture book: the same page,
+                  several times. Without this it means dragging a scrubber that does
+                  not exist. */}
+              <button
+                className="replay"
+                onClick={readAlong.replay}
+                aria-label="Read this page again"
+                title="Read this page again"
+              >
+                {'\u21ba'}
+              </button>
+            </>
           )}
           {zoomed ? (
             <button className="icon-button" onClick={gestures.resetZoom}>

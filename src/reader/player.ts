@@ -123,6 +123,26 @@ export class ReadAlongPlayer {
     this.frame = 0
   }
 
+  /**
+   * Play this spread again from its first word.
+   *
+   * Repetition is how a young child uses a picture book — the same page, several
+   * times over — and doing it by hand means dragging a scrubber the app does not
+   * have. Starting time is forced rather than left to `play`, which only rewinds
+   * when the playhead has drifted outside the segment.
+   */
+  async restart(): Promise<void> {
+    const first = this.segments[0]
+    if (!first) return
+
+    this.pause()
+    this.segmentIndex = 0
+    this.activeFragment = -1
+    await this.loadSegment(first)
+    this.audio.currentTime = first.fragments[0]!.start
+    await this.play()
+  }
+
   async toggle(): Promise<void> {
     if (this.playing) this.pause()
     else await this.play()

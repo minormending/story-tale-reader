@@ -13,6 +13,8 @@ export interface ReadAlong {
   available: boolean
   playing: boolean
   toggle: () => void
+  /** Play the spread on screen again from its first word. */
+  replay: () => void
   stop: () => void
   onPageReady: (doc: Document, page: BookPage) => void
   /** True when a tap landed on a word the narration can jump to. */
@@ -119,6 +121,11 @@ export function useReadAlong({
     void playerRef.current?.toggle()
   }, [])
 
+  /** Hear this spread again from the beginning. */
+  const replay = useCallback(() => {
+    void playerRef.current?.restart()
+  }, [])
+
   const stop = useCallback(() => {
     keepReading.current = false
     playerRef.current?.pause()
@@ -129,5 +136,5 @@ export function useReadAlong({
     [],
   )
 
-  return { available, playing, toggle, stop, onPageReady, claimsTap }
+  return { available, playing, toggle, replay, stop, onPageReady, claimsTap }
 }
