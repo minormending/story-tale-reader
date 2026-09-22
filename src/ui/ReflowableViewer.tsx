@@ -8,6 +8,7 @@ import { useChromeAutoHide } from './useChromeAutoHide'
 import { LockButton } from './LockButton'
 import { BookmarkToggle, BookmarksSection } from './Bookmarks'
 import { ContentsSection } from './Contents'
+import { ReadingSupportSection } from './ReadingSupport'
 import { announceScreen } from '../reader/announce'
 import { captureAnchor, screenForAnchor, screenForFragment } from '../reader/anchor'
 import { addBookmark, listBookmarks, removeBookmark, type Bookmark } from '../store/bookmarks'
@@ -476,6 +477,8 @@ export function ReflowableViewer({
           <p className="menu-hint">
             Extra space between letters helps some children read more accurately.
           </p>
+
+          <ReadingSupportSection book={book} />
         </div>
       )}
 

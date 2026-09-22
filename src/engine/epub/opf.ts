@@ -56,6 +56,15 @@ export function parsePackageDocument(xml: string, packagePath: string): PackageD
 
   const metadataEl = findFirst(pkg, 'metadata')
   const meta = new Map<string, string>()
+  /*
+   * The same property, every time it appears.
+   *
+   * `meta` keeps one value per property, which is right for the singular ones and
+   * wrong for the accessibility vocabulary: a book states `schema:accessibilityFeature`
+   * once per feature, so "alternativeText, synchronizedAudioText, printPageNumbers"
+   * arrives as three elements and the single-valued map kept only the last.
+   */
+  const metaAll = new Map<string, string[]>()
   const refines = new Map<string, Map<string, string>>()
   const collections: Array<{ id?: string; name: string }> = []
 
@@ -78,6 +87,7 @@ export function parsePackageDocument(xml: string, packagePath: string): PackageD
         refines.set(id, bucket)
       } else if (property) {
         meta.set(property, value)
+        metaAll.set(property, [...(metaAll.get(property) ?? []), value])
       } else {
         // EPUB 2 style: <meta name="cover" content="cover-image"/>
         const name = attr(m, 'name')
@@ -104,6 +114,12 @@ export function parsePackageDocument(xml: string, packagePath: string): PackageD
     language: dc('language'),
     publisher: dc('publisher'),
     identifier,
+    accessibility: {
+      features: metaAll.get('schema:accessibilityFeature') ?? [],
+      hazards: metaAll.get('schema:accessibilityHazard') ?? [],
+      accessModes: metaAll.get('schema:accessMode') ?? [],
+      summary: meta.get('schema:accessibilitySummary') || undefined,
+    },
   }
 
   /* ---------------------------- manifest ---------------------------- */

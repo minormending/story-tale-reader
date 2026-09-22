@@ -13,6 +13,7 @@ import { useChromeAutoHide } from './useChromeAutoHide'
 import { LockButton } from './LockButton'
 import { BookmarkToggle, BookmarksSection } from './Bookmarks'
 import { ContentsSection } from './Contents'
+import { ReadingSupportSection } from './ReadingSupport'
 import { addBookmark, listBookmarks, removeBookmark, type Bookmark } from '../store/bookmarks'
 import { loadSettings, saveSettings } from '../store/settings'
 import { MODE_LABELS, READING_MODES } from '../reader/readingMode'
@@ -468,6 +469,8 @@ export function Viewer({
               <hr className="menu-rule" />
             </>
           )}
+
+          <ReadingSupportSection book={book} />
 
           <div className="menu-row">
             {(['auto', 'single', 'double'] as const).map((mode) => (

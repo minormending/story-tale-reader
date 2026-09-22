@@ -4,6 +4,7 @@ import { ZipArchive, type ByteSource } from '../zip/reader'
 import { dirname, resolvePath } from '../path'
 import { findPackagePath, detectDrm, DrmError } from './ocf'
 import { parsePackageDocument, spineItems, hasMediaOverlays, type PackageDocument } from './opf'
+import { addAltCounts, countAltText, EMPTY_ALT_COUNT } from './altText'
 import { parseNavDocument, parseNcx, emptyNav, type NavDocument } from './nav'
 import {
   detectLayout, layoutFromSpineProperties, parseSpreadPolicy, parseIbooksDisplayOptions,
@@ -215,6 +216,24 @@ export async function loadEpub(
     }
   })
 
+  /*
+   * Do the book's pictures carry any description? (docs/accessibility.md)
+   *
+   * Bounded to the same sample the layout detector uses, and skipped entirely on
+   * the deferred path, because this runs while somebody is waiting for a book to
+   * open and the honest answer for a long book is worth less than a fast open. The
+   * note it feeds says how far it looked, so a partial answer never reads as a
+   * complete one.
+   */
+  let altText = { ...EMPTY_ALT_COUNT, pagesChecked: 0, pageCount: entries.length }
+  if (measure) {
+    for (const [index, { item }] of entries.slice(0, DETECTION_SAMPLE).entries()) {
+      const xml = await safeReadText(archive, item.path)
+      if (xml) altText = { ...addAltCounts(altText, countAltText(xml)), pagesChecked: altText.pagesChecked + 1, pageCount: entries.length }
+      if ((index + 1) % YIELD_EVERY === 0) await yieldToPaint()
+    }
+  }
+
   const book: ParsedBook = {
     format: 'epub',
     metadata: pkg.metadata,
@@ -229,6 +248,7 @@ export async function loadEpub(
     hasMediaOverlays: hasMediaOverlays(pkg),
     activeClass: pkg.meta.get('media:active-class') || undefined,
     packagePath,
+    altText,
   }
 
   return {
