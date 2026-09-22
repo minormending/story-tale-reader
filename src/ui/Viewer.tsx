@@ -14,6 +14,8 @@ import { LockButton } from './LockButton'
 import { BookmarkToggle, BookmarksSection } from './Bookmarks'
 import { ContentsSection } from './Contents'
 import { addBookmark, listBookmarks, removeBookmark, type Bookmark } from '../store/bookmarks'
+import { loadSettings, saveSettings } from '../store/settings'
+import { MODE_LABELS, READING_MODES } from '../reader/readingMode'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { InlinePageResolver } from '../vfs/inline'
 import { isVfsReady } from '../vfs/client'
@@ -52,11 +54,20 @@ export function Viewer({
   const [menuOpen, setMenuOpen] = useState(false)
   const [locked, setLocked] = useState(false)
 
+  /**
+   * "Read together" has finished reading this spread and is waiting to be turned.
+   *
+   * Holds the bars up, because three seconds is the time it takes to notice them,
+   * not the time it takes a grown-up to talk about a picture. The mode's whole
+   * promise is that the book waits; bars that retire mid-sentence break it.
+   */
+  const [waitingForReader, setWaitingForReader] = useState(false)
+
   // A picture book is read slowly enough to outlast a screen timeout.
   useWakeLock(true)
 
   // The bars are drawn over the page; let them retire so it can be seen whole.
-  useChromeAutoHide(chromeVisible, () => setChromeVisible(false), menuOpen)
+  useChromeAutoHide(chromeVisible, () => setChromeVisible(false), menuOpen || waitingForReader)
 
   const modal = useMemo(
     () => modalViewport(book.pages.map((page) => page.viewport)) ?? DEFAULT_VIEWPORT,
@@ -127,10 +138,25 @@ export function Viewer({
   // In a right-to-left book the "next" page is to the left.
   const forward = book.direction === 'rtl' ? -1 : 1
 
+  // `mode: null` means "not read back yet", and the reader stays silent until it
+  // is. Starting at the default instead would have a book saved as "Read myself"
+  // narrate for as long as the lookup took.
   const [readAlongSettings, setReadAlongSettings] = useState<ReadAlongSettings>({
     rate: 1,
-    autoAdvance: true,
+    mode: null,
   })
+
+  // How this household reads outlives the book, so it is read back rather than
+  // assumed.
+  useEffect(() => {
+    let cancelled = false
+    void loadSettings().then((stored) => {
+      if (!cancelled) setReadAlongSettings((current) => ({ ...current, mode: stored.readingMode }))
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const readAlong = useReadAlong({
     book,
@@ -139,7 +165,29 @@ export function Viewer({
     direction: book.direction,
     settings: readAlongSettings,
     onFinishedSpread: () => turn(forward),
+    // "Read together" ends each page with a grown-up about to turn it. The bars
+    // hide themselves after three seconds, so without this the control they need
+    // is behind a tap on an empty-looking page.
+    onWaitingForReader: () => {
+      setChromeVisible(true)
+      setWaitingForReader(true)
+    },
   })
+
+  /**
+   * The wait is over the moment the page turns or narration speaks again.
+   *
+   * Both are the reader answering it, and leaving the flag set would pin the bars
+   * up for the rest of the book -- which is the covering that auto-hide exists to
+   * undo (SPEC.md §6.2).
+   */
+  useEffect(() => {
+    if (readAlong.playing) setWaitingForReader(false)
+  }, [readAlong.playing])
+
+  useEffect(() => {
+    setWaitingForReader(false)
+  }, [spreadIndex])
 
   // The drawn size of the spread, which bounds how far a zoomed page can be panned.
   const rendered = useMemo(() => {
@@ -381,18 +429,22 @@ export function Viewer({
                   </button>
                 ))}
               </div>
-              <button
-                className="menu-item"
-                onClick={() =>
-                  setReadAlongSettings((current) => ({
-                    ...current,
-                    autoAdvance: !current.autoAdvance,
-                  }))
-                }
-              >
-                <span>Turn the page automatically</span>
-                <span className="muted">{readAlongSettings.autoAdvance ? 'on' : 'off'}</span>
-              </button>
+              <div className="menu-modes">
+                {READING_MODES.map((mode) => (
+                  <button
+                    key={mode}
+                    className={`mode${readAlongSettings.mode === mode ? ' mode-on' : ''}`}
+                    aria-pressed={readAlongSettings.mode === mode}
+                    onClick={() => {
+                      setReadAlongSettings((current) => ({ ...current, mode }))
+                      void saveSettings({ readingMode: mode })
+                    }}
+                  >
+                    <span className="mode-name">{MODE_LABELS[mode].name}</span>
+                    <span className="mode-hint">{MODE_LABELS[mode].hint}</span>
+                  </button>
+                ))}
+              </div>
               <p className="menu-hint">Tap any word to hear it read from there.</p>
               <hr className="menu-rule" />
             </>

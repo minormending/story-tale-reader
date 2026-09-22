@@ -360,6 +360,39 @@ button { font: inherit; cursor: pointer; }
 }
 .chip-on { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
 
+/* The three ways a narrated book gets read (SPEC.md §7.3).
+   Stacked rather than a chip row: each one carries a sentence saying what it
+   promises, and the promise is the point -- "Read together" only means anything
+   if the person choosing it can see that the book will wait for them. Three
+   labels side by side would have to lose the sentences to fit a phone. */
+.menu-modes { display: flex; flex-direction: column; gap: 0.4rem; }
+.mode {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  width: 100%;
+  background: var(--sunken);
+  color: var(--fg);
+  border: 2px solid transparent;
+  border-radius: 10px;
+  padding: 0.6rem 0.9rem;
+  min-height: 48px;
+  text-align: left;
+}
+.mode:hover { background: var(--hover-strong); }
+/* Border as well as fill: the chosen mode has to survive being looked at on a
+   dim tablet in a dark room, which is where this app gets used. */
+.mode-on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+.mode-name { font-size: 0.95rem; font-weight: 600; }
+.mode-hint { font-size: 0.78rem; color: var(--fg-muted); line-height: 1.35; }
+/* Inherit inside the selected card, where --fg-muted is the wrong ink entirely:
+   it is tuned for the menu's own background, not for the accent fill. */
+.mode-on .mode-hint { color: inherit; opacity: 0.85; }
+
 .dev-corpus { display: flex; flex-direction: column; gap: 0.4rem; }
 .dev-corpus .menu-row { flex-wrap: wrap; }
 .dev-corpus .chip { flex: 0 1 auto; padding: 0.45rem 0.85rem; }

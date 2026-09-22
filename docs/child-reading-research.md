@@ -109,15 +109,24 @@ here.
 3. **Replay the page.** One control to hear the current spread again, without
    rewinding by hand. Repetition is how early readers use a book, and this adds no
    content and interrupts nothing.
-4. **"Read to me" / "Read it myself".** Name the two ways a narrated book gets used.
-   Cheap, and it sets the expectation the rest of the interface then meets.
+4. **"Read to me" / "Read together" / "Read myself" — built.** Three named modes
+   replace the "turn the page automatically" toggle, and the choice is remembered
+   across books. *Read together* narrates each spread, stops, and puts the chrome
+   back so the grown-up has the page-turn control to hand — the one direct answer
+   in this list to the largest effect anybody measured. See SPEC.md §7.3.
 5. **A word list after the book.** The words the child tapped during reading,
    offered at the end — vocabulary support at the moment the evidence says it is
    free.
 6. **Highlight strength.** An override for books whose own active-class styling is
    too faint to notice, given where children actually look.
 
-Numbers 1–3 are days of work. Numbers 4–6 need design thought first.
+Numbers 1–4 are built. Numbers 5 and 6 need design thought first.
+
+Worth recording what number 4 cost, because it argues for doing 5 and 6: the
+behaviour was almost entirely already there. What was missing was a name for it.
+The reader could auto-advance, could stop at the end of a page, and could speak a
+tapped word, but it described those as a checkbox about page turns, so the mode the
+research most supports — an adult reading alongside — was available and invisible.
 
 ## What I would not build, and why it is tempting
 

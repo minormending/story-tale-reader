@@ -481,12 +481,43 @@ injected default highlight.
 - On each frame: binary-search the timeline for the active `par`, and if it changed, remove the active class from the previous element and add it to the new one (via the same-origin iframe's `contentDocument`).
 - At a page's last `par` end: pause and hold, or auto-turn and continue, per setting.
 - **Tap a word** → look up its `par` → `audio.currentTime = clipBegin` → play. This is the feature that makes kids re-listen to a word they didn't catch.
-- Controls: play/pause, 0.75× / 1× / 1.25× rate (`preservesPitch = true`), auto-advance toggle, highlight on/off.
+- Controls: play/pause, 0.75× / 1× / 1.25× rate (`preservesPitch = true`), reading mode (§7.3), highlight on/off.
 - **Replay the spread.** **Built.** Repetition is how a young child uses a picture
   book, and without a control for it the only options are turning back and forth or
   tapping the first word. Restarts the spread on screen, not the book.
 
-### 7.3 Clock values
+### 7.3 Reading modes
+
+**Built.** The reader offers three named ways to read a narrated book, replacing
+the bare "turn the page automatically" toggle. The setting is the reader's, not the
+book's, and persists across books and sessions (`settings` store, DB v4).
+
+| Mode | Narrates | Turns the page | Chrome on finish |
+|---|---|---|---|
+| **Read to me** | yes | itself | — |
+| **Read together** | yes | the reader does | shown |
+| **Read myself** | no (tap a word) | the reader does | — |
+
+*Read to me* is the default: it is the only mode that works with nobody else in the
+room, and it is what the reader did before modes existed, so an update does not
+change how a familiar book behaves.
+
+*Read together* is the point of the exercise. The meta-analyses in
+`docs/child-reading-research.md` put the largest measured effect on an adult reading
+*with* the child — larger than any enhancement inside a digital book — and nothing in
+this interface had previously invited it. Narration stops at the end of each spread
+and the chrome is brought back — and *held* up. It auto-hides after three seconds
+(§6.2), which is the time it takes to notice the bars, not the time it takes a
+grown-up to talk about a picture; bars that retire mid-sentence break the mode's one
+promise. The hold is released by the next page turn or by narration speaking again,
+so it cannot pin the bars up for the rest of the book.
+
+A deliberate pause must survive a page turn: the player reports `isPlaying` false
+both when narration runs out and when someone presses pause, so the two are tracked
+apart. A mode that narrates picks up the next spread on its own; a reader who
+silenced the book does not have it start talking again because they turned a page.
+
+### 7.4 Clock values
 
 SMIL clock parsing must handle `00:02:23.297`, `02:23.297`, `23.297s`, `2.5min`,
 `1h`, and bare seconds. Small, fully unit-tested module.

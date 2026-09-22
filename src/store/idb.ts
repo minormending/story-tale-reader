@@ -7,7 +7,7 @@
  */
 
 const DB_NAME = 'story-tale-reader'
-const DB_VERSION = 3
+const DB_VERSION = 4
 
 export const STORE_BOOKS = 'books'
 export const STORE_PROGRESS = 'progress'
@@ -16,6 +16,8 @@ export const STORE_BLOBS = 'blobs'
 export const STORE_BOOKMARKS = 'bookmarks'
 /** What a book's pages measured to last time, so reopening need not measure again. */
 export const STORE_LAYOUT = 'layout'
+/** Preferences that belong to the reader rather than to any one book. */
+export const STORE_SETTINGS = 'settings'
 
 let connection: Promise<IDBDatabase> | undefined
 
@@ -33,6 +35,7 @@ export function openDatabase(): Promise<IDBDatabase> {
         STORE_BLOBS,
         STORE_BOOKMARKS,
         STORE_LAYOUT,
+        STORE_SETTINGS,
       ]) {
         if (!db.objectStoreNames.contains(name)) db.createObjectStore(name, { keyPath: 'id' })
       }

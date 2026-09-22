@@ -155,12 +155,22 @@ stateDiagram-v2
     Idle --> Playing: press play
     Playing --> Idle: press pause
     Playing --> SpreadDone: last segment ends
-    SpreadDone --> Turning: auto-advance on, and a page follows
+    SpreadDone --> Turning: Read to me, and a page follows
+    SpreadDone --> Waiting: Read together
     SpreadDone --> Idle: nothing left to turn to
+    Waiting --> Turning: the grown-up turns it
     Turning --> Loading: new spread mounts
-    Loading --> Playing: it has narration
+    Loading --> Playing: it narrates, and nobody pressed pause
     Loading --> Idle: it does not
 ```
+
+Which branch `SpreadDone` takes is the reading mode (SPEC.md §7.3). *Read to me*
+turns the page itself; *Read together* stops and brings the chrome back so the
+control is already there; *Read myself* never reaches `Playing` on its own at all.
+
+`Waiting` is a state of the interface rather than of the player — the player is
+simply idle — which is why the mode, not the player, decides whether the bars come
+back.
 
 The subtlety is that the player stops itself *before* announcing that it finished:
 
