@@ -1,7 +1,7 @@
 {
   "name": "story-tale-reader",
   "private": true,
-  "version": "0.7.0",
+  "version": "0.7.1",
   "type": "module",
   "description": "A fixed-layout-first ebook reader for children's picture books",
   "license": "MIT",
