@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { applyDocumentLanguage } from '../reader/language'
 import { bookFileUrl } from '../vfs/protocol'
 import { reflowableStyles, screenCount, type Typography } from '../reader/typography'
 import type { BookPage } from '../engine/types'
@@ -19,6 +20,7 @@ export function ReflowableStage({
   frame,
   typography,
   screen,
+  language,
   onMeasured,
   onDocumentReady,
   resolveInline,
@@ -28,6 +30,8 @@ export function ReflowableStage({
   frame: Size
   typography: Typography
   screen: number
+  /** The book's own `dc:language`, for sections that do not declare one. */
+  language?: string
   /** Reports how many screens this document turned out to occupy. */
   onMeasured: (count: number) => void
   /** Called with the page document so keyboard handling can be attached to it. */
@@ -53,6 +57,8 @@ export function ReflowableStage({
     const doc = frameRef.current?.contentDocument
     const body = doc?.body
     if (!doc || !body || frame.width <= 0) return
+
+    applyDocumentLanguage(doc, language)
 
     let style = doc.getElementById(STYLE_ID)
     if (!style) {

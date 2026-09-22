@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { bookFileUrl } from '../vfs/protocol'
+import { applyDocumentLanguage } from '../reader/language'
 import type { BookPage } from '../engine/types'
 
 /**
@@ -18,12 +19,15 @@ export function PageFrame({
   bookId,
   page,
   scale,
+  language,
   onReady,
   resolveInline,
 }: {
   bookId: string
   page: BookPage
   scale: number
+  /** The book's own `dc:language`, for pages that do not declare one. */
+  language?: string
   onReady?: (doc: Document, page: BookPage) => void
   /**
    * Set when the service worker is unavailable: returns a self-contained document
@@ -49,9 +53,10 @@ export function PageFrame({
       const doc = event.currentTarget.contentDocument
       if (!doc) return
       injectViewerStyles(doc)
+      applyDocumentLanguage(doc, language)
       onReady?.(doc, page)
     },
-    [onReady, page],
+    [onReady, page, language],
   )
 
   if (resolveInline && inlineHtml === null) return null

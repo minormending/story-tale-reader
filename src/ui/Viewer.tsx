@@ -16,6 +16,7 @@ import { ContentsSection } from './Contents'
 import { addBookmark, listBookmarks, removeBookmark, type Bookmark } from '../store/bookmarks'
 import { loadSettings, saveSettings } from '../store/settings'
 import { MODE_LABELS, READING_MODES } from '../reader/readingMode'
+import { announceSpread } from '../reader/announce'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { InlinePageResolver } from '../vfs/inline'
 import { isVfsReady } from '../vfs/client'
@@ -286,10 +287,27 @@ export function Viewer({
   )
   const shift = overrides.spreadShift ?? 0
 
+  /*
+   * Said aloud when the page changes, and only then.
+   *
+   * The toolbar already shows "3 / 12" but cannot carry this: it reads as "three
+   * slash twelve", and it retires after three seconds (§6.2), so most of the time
+   * there is nothing on screen for a live region to be attached to.
+   */
+  const announcement = useMemo(() => {
+    const shown = spread?.center
+      ? [spread.center]
+      : [spread?.left, spread?.right].filter((page): page is BookPage => page !== undefined)
+    return announceSpread(shown, spreadIndex, spreads.length)
+  }, [spread, spreadIndex, spreads.length])
+
   return (
     // Locked means a child is holding this, so the controls that remain grow to
     // suit smaller hands — see docs/child-reading-research.md.
     <div className={`viewer${locked ? ' viewer-locked' : ''}`}>
+      <p className="a11y-live" aria-live="polite" aria-atomic="true">
+        {announcement}
+      </p>
       <main className="stage" ref={stageRef} {...gestures.stageProps}>
         {spread && (
           <div
@@ -312,6 +330,7 @@ export function Viewer({
                   bookId={bookId}
                   page={page}
                   scale={scale}
+                  language={book.metadata.language}
                   onReady={handlePageReady}
                   resolveInline={resolveInline}
                 />

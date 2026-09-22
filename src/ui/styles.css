@@ -355,7 +355,13 @@ button { font: inherit; cursor: pointer; }
   border: 1px solid transparent;
   border-radius: 999px;
   padding: 0.5rem 0.4rem;
-  min-height: 40px;
+  /* 48px, matching .menu-item and .mode beside it. At 40px these were the only
+     controls in the app under the 44px adult floor, in a menu whose other rows
+     had already been raised. Not the ~2cm (76px) that
+     docs/child-reading-research.md asks for -- that figure is for the controls a
+     child drives, which is what lock mode sizes (SPEC.md §6.2); this menu is the
+     grown-up's surface and three 76px rows of chips would not fit a phone. */
+  min-height: 48px;
   font-size: 0.9rem;
 }
 .chip-on { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
@@ -957,3 +963,32 @@ button { font: inherit; cursor: pointer; }
 
 /* In a child's hands it is the same size as everything else they can press. */
 .viewer-locked .replay { width: 76px; height: 76px; font-size: 1.5rem; }
+
+/* ---------------------------- announcements ---------------------------- */
+
+/*
+ * Spoken, never drawn.
+ *
+ * The page indicator cannot do this job: it reads as "three slash twelve", and it
+ * retires after three seconds (SPEC.md §6.2), so for most of a book there is
+ * nothing on screen to attach a live region to.
+ *
+ * `opacity: 0` rather than `visibility: hidden` or `display: none`, both of which
+ * would take the text out of the accessibility tree and silence the very
+ * announcement this exists to make. It also keeps the audit's clipped-text check
+ * away: that check skips anything at zero opacity, where a 1px box holding a
+ * sentence would otherwise read as content the reader had lost.
+ */
+.a11y-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+}

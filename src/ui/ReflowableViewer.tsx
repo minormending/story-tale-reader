@@ -8,6 +8,7 @@ import { useChromeAutoHide } from './useChromeAutoHide'
 import { LockButton } from './LockButton'
 import { BookmarkToggle, BookmarksSection } from './Bookmarks'
 import { ContentsSection } from './Contents'
+import { announceScreen } from '../reader/announce'
 import { captureAnchor, screenForAnchor, screenForFragment } from '../reader/anchor'
 import { addBookmark, listBookmarks, removeBookmark, type Bookmark } from '../store/bookmarks'
 import { DEFAULT_TYPOGRAPHY, type ReaderFont, type ReaderTheme, type Typography } from '../reader/typography'
@@ -71,6 +72,34 @@ export function ReflowableViewer({
   const [screenCount, setScreenCount] = useState(1)
 
   const section = sections[Math.min(sectionIndex, sections.length - 1)]
+
+  /*
+   * What a screen reader is told when the view changes.
+   *
+   * The chapter is named only when it changes. Repeating it on every swipe would
+   * make a long chapter unbearable to read this way, and the screen number alone
+   * is meaningless when you have just arrived somewhere new.
+   */
+  const sectionLabel = useMemo(() => {
+    if (!section) return undefined
+    const walk = (items: typeof book.nav): string | undefined => {
+      for (const item of items) {
+        if (item.path === section.path) return item.label
+        const found = walk(item.children)
+        if (found) return found
+      }
+      return undefined
+    }
+    return walk(book.nav)
+  }, [book.nav, section])
+
+  const spokenSection = useRef<number | null>(null)
+  const [announcement, setAnnouncement] = useState('')
+  useEffect(() => {
+    const changed = spokenSection.current !== sectionIndex
+    spokenSection.current = sectionIndex
+    setAnnouncement(announceScreen(screen, screenCount, sectionLabel, changed))
+  }, [sectionIndex, screen, screenCount, sectionLabel])
 
   const notify = useRef(onPositionChange)
   notify.current = onPositionChange
@@ -307,12 +336,16 @@ export function ReflowableViewer({
     // Locked means a child is holding this, so the controls that remain grow to
     // suit smaller hands — see docs/child-reading-research.md.
     <div className={`viewer viewer-reflow${locked ? ' viewer-locked' : ''}`}>
+      <p className="a11y-live" aria-live="polite" aria-atomic="true">
+        {announcement}
+      </p>
       <main className="stage" ref={stageRef} {...gestures.stageProps}>
         {section && frame.width > 0 && (
           <ReflowableStage
             key={section.index}
             bookId={bookId}
             page={section}
+            language={book.metadata.language}
             frame={frame}
             typography={typography}
             screen={Math.max(screen, 0)}
