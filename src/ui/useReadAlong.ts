@@ -38,6 +38,8 @@ export interface ReadAlong {
   speak: (pageIndex: number, elementId: string) => void
   stop: () => void
   onPageReady: (doc: Document, page: BookPage) => void
+  /** A page has left the screen; read-along should stop holding its document. */
+  onPageGone: (pageIndex: number, doc: Document) => void
   /** True when a tap landed on a word the narration can jump to. */
   claimsTap: (target: EventTarget | null) => boolean
 }
@@ -236,6 +238,10 @@ export function useReadAlong({
     playerRef.current?.registerDocument(page.index, doc)
   }, [])
 
+  const onPageGone = useCallback((pageIndex: number, doc: Document) => {
+    playerRef.current?.unregisterDocument(pageIndex, doc)
+  }, [])
+
   const toggle = useCallback(() => {
     const player = playerRef.current
     if (!player) return
@@ -276,5 +282,5 @@ export function useReadAlong({
     [],
   )
 
-  return { available, playing, toggle, replay, speak, stop, onPageReady, claimsTap }
+  return { available, playing, toggle, replay, speak, stop, onPageReady, onPageGone, claimsTap }
 }

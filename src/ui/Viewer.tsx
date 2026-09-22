@@ -255,6 +255,18 @@ export function Viewer({
     [attachPageKeys, gestures, readAlong],
   )
 
+  /*
+   * Let read-along stop holding a page that has left the screen.
+   *
+   * The keyboard and gesture handlers need no counterpart: both attach listeners
+   * to the document and nothing else, so they go when it does. Read-along keeps a
+   * reference, which is what made this necessary.
+   */
+  const handlePageGone = useCallback(
+    (pageIndex: number, doc: Document) => readAlong.onPageGone(pageIndex, doc),
+    [readAlong],
+  )
+
   /* ------------------------------ bookmarks ------------------------------ */
 
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([])
@@ -351,6 +363,7 @@ export function Viewer({
                   scale={scale}
                   language={book.metadata.language}
                   onReady={handlePageReady}
+                  onGone={handlePageGone}
                   resolveInline={resolveInline}
                 />
               )

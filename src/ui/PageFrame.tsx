@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { bookFileUrl } from '../vfs/protocol'
 import { applyDocumentLanguage } from '../reader/language'
 import type { BookPage } from '../engine/types'
@@ -21,6 +21,7 @@ export function PageFrame({
   scale,
   language,
   onReady,
+  onGone,
   resolveInline,
 }: {
   bookId: string
@@ -29,6 +30,14 @@ export function PageFrame({
   /** The book's own `dc:language`, for pages that do not declare one. */
   language?: string
   onReady?: (doc: Document, page: BookPage) => void
+  /**
+   * This page's document is going away.
+   *
+   * Read-along holds one document per page so it can highlight and take taps,
+   * and without this it held every page the reader had ever turned to — a
+   * detached copy of each, with its images, for the life of the book.
+   */
+  onGone?: (pageIndex: number, doc: Document) => void
   /**
    * Set when the service worker is unavailable: returns a self-contained document
    * for this page, which is handed to the iframe through srcdoc (SPEC.md §9.3).
@@ -48,16 +57,37 @@ export function PageFrame({
     }
   }, [resolveInline, page.path])
 
+  /*
+   * The document this frame last handed over, so it can be handed back.
+   *
+   * Held in a ref rather than state: it is only ever read by the cleanup below,
+   * and setting state on load would re-render every page of a spread for nothing.
+   */
+  const handed = useRef<Document | null>(null)
+  const gone = useRef(onGone)
+  gone.current = onGone
+
   const handleLoad = useCallback(
     (event: React.SyntheticEvent<HTMLIFrameElement>) => {
       const doc = event.currentTarget.contentDocument
       if (!doc) return
+      handed.current = doc
       injectViewerStyles(doc)
       applyDocumentLanguage(doc, language)
       onReady?.(doc, page)
     },
     [onReady, page, language],
   )
+
+  // Empty deps: this fires when the frame leaves, not when its props change.
+  useEffect(() => {
+    const index = page.index
+    return () => {
+      if (handed.current) gone.current?.(index, handed.current)
+      handed.current = null
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   if (resolveInline && inlineHtml === null) return null
 

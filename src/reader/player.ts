@@ -133,10 +133,21 @@ export class ReadAlongPlayer {
     this.highlight(fragment)
   }
 
-  unregisterDocument(pageIndex: number): void {
-    const doc = this.documents.get(pageIndex)
-    if (doc) doc.removeEventListener('click', this.onDocumentClick)
+  /**
+   * Let a page's document go.
+   *
+   * `doc` names which one, because React can mount the page that replaces this
+   * one before unmounting it, and an unregister that fired afterwards would
+   * silently drop the live document and leave the page unhighlightable and
+   * untappable. Given one, this releases only that exact document.
+   */
+  unregisterDocument(pageIndex: number, doc?: Document): void {
+    const held = this.documents.get(pageIndex)
+    if (!held) return
+    if (doc && held !== doc) return
+    held.removeEventListener('click', this.onDocumentClick)
     this.documents.delete(pageIndex)
+    if (this.activeElement?.ownerDocument === held) this.activeElement = null
   }
 
   /** Point the player at the pages currently on screen, in reading order. */
