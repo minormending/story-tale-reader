@@ -492,15 +492,26 @@ injected default highlight.
 the bare "turn the page automatically" toggle. The setting is the reader's, not the
 book's, and persists across books and sessions (`settings` store, DB v4).
 
-| Mode | Narrates | Turns the page | Chrome on finish |
-|---|---|---|---|
-| **Read to me** | yes | itself | — |
-| **Read together** | yes | the reader does | shown |
-| **Read myself** | no (tap a word) | the reader does | — |
+No mode narrates a book that has just been opened — reading always begins with
+play. What the mode governs is what happens once it is under way.
 
-*Read to me* is the default: it is the only mode that works with nobody else in the
-room, and it is what the reader did before modes existed, so an update does not
-change how a familiar book behaves.
+| Mode | On a page turn | Turns the page | Chrome on finish |
+|---|---|---|---|
+| **Read to me** | reads on | itself | — |
+| **Read together** | reads on | the reader does | shown and held |
+| **Read myself** | stops | the reader does | — |
+
+In every mode a tapped word is spoken, which is how "Read myself" offers help
+without offering narration.
+
+*Read to me* is the default: it is what the reader did before modes existed, so an
+update does not change how a familiar book behaves.
+
+Auto-starting narration when a book opens was built and then removed. It gives
+nobody a moment to look at the page, and with auto-advance on the book reads itself
+to the end whether or not anyone is listening. The audit caught it by way of the
+pre-existing `read-along` state, which had always assumed a book is silent until
+asked — a reasonable assumption that should not have been broken quietly.
 
 *Read together* is the point of the exercise. The meta-analyses in
 `docs/child-reading-research.md` put the largest measured effect on an adult reading

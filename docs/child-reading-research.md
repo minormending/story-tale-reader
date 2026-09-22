@@ -111,9 +111,10 @@ here.
    content and interrupts nothing.
 4. **"Read to me" / "Read together" / "Read myself" — built.** Three named modes
    replace the "turn the page automatically" toggle, and the choice is remembered
-   across books. *Read together* narrates each spread, stops, and puts the chrome
-   back so the grown-up has the page-turn control to hand — the one direct answer
-   in this list to the largest effect anybody measured. See SPEC.md §7.3.
+   across books. *Read together* narrates each spread, stops, and holds the chrome
+   up so the grown-up has the page-turn control to hand — the one direct answer in
+   this list to the largest effect anybody measured. Reading still begins with
+   play in every mode. See SPEC.md §7.3.
 5. **A word list after the book.** The words the child tapped during reading,
    offered at the end — vocabulary support at the moment the evidence says it is
    free.

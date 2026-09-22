@@ -14,9 +14,23 @@ describe('reading modes', () => {
     expect(turners).toEqual(['to-me'])
   })
 
-  it('only the mode named for the child reading stays quiet', () => {
-    const silent = READING_MODES.filter((mode) => !behaviourFor(mode).narrates)
-    expect(silent).toEqual(['myself'])
+  it('only the mode named for the child reading lets a page turn end the reading', () => {
+    const stops = READING_MODES.filter((mode) => !behaviourFor(mode).resumesOnTurn)
+    expect(stops).toEqual(['myself'])
+  })
+
+  it('has no mode that starts a book talking by itself', () => {
+    // There is deliberately no such flag. Opening a book narrates in no mode: it
+    // gives nobody a moment to look at the page, and with auto-advance on the book
+    // reads itself to the end whether or not anyone is listening. If a flag like
+    // this reappears, this test is the place that argued against it.
+    for (const mode of READING_MODES) {
+      expect(Object.keys(behaviourFor(mode))).toEqual([
+        'autoAdvance',
+        'resumesOnTurn',
+        'revealOnFinish',
+      ])
+    }
   })
 
   it('shows the page-turn control again only where someone has to turn it', () => {
@@ -35,7 +49,10 @@ describe('reading modes', () => {
 
   it('keeps the behaviour the reader had before modes existed as the default', () => {
     expect(DEFAULT_READING_MODE).toBe('to-me')
-    expect(behaviourFor(DEFAULT_READING_MODE)).toMatchObject({ autoAdvance: true, narrates: true })
+    expect(behaviourFor(DEFAULT_READING_MODE)).toMatchObject({
+      autoAdvance: true,
+      resumesOnTurn: true,
+    })
   })
 
   it('names every mode it offers', () => {

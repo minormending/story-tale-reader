@@ -20,11 +20,11 @@ export const READING_MODES: readonly ReadingMode[] = ['to-me', 'together', 'myse
 export const MODE_LABELS: Record<ReadingMode, { name: string; hint: string }> = {
   'to-me': {
     name: 'Read to me',
-    hint: 'The book reads itself and turns its own pages.',
+    hint: 'Plays straight through, turning the pages for you.',
   },
   together: {
     name: 'Read together',
-    hint: 'The book reads each page, then waits for you to turn it.',
+    hint: 'Reads a page, then waits for you to turn it.',
   },
   myself: {
     name: 'Read myself',
@@ -35,8 +35,16 @@ export const MODE_LABELS: Record<ReadingMode, { name: string; hint: string }> = 
 export interface ModeBehaviour {
   /** Narration turns the page itself when it reaches the end of a spread. */
   autoAdvance: boolean
-  /** Narration starts on its own once a spread is ready, without asking. */
-  narrates: boolean
+  /**
+   * A new spread picks narration up where the last one left off.
+   *
+   * Not "starts on its own": opening a book never narrates until someone presses
+   * play, in any mode. That was tried and is wrong — a book that starts talking
+   * when it is opened gives nobody a moment to look at the page, and with
+   * auto-advance on it will read itself to the end whether or not anyone is
+   * listening. What the mode governs is what happens once reading is under way.
+   */
+  resumesOnTurn: boolean
   /**
    * Bring the chrome back when narration stops with the page still on screen.
    *
@@ -50,9 +58,9 @@ export interface ModeBehaviour {
 }
 
 const BEHAVIOUR: Record<ReadingMode, ModeBehaviour> = {
-  'to-me': { autoAdvance: true, narrates: true, revealOnFinish: false },
-  together: { autoAdvance: false, narrates: true, revealOnFinish: true },
-  myself: { autoAdvance: false, narrates: false, revealOnFinish: false },
+  'to-me': { autoAdvance: true, resumesOnTurn: true, revealOnFinish: false },
+  together: { autoAdvance: false, resumesOnTurn: true, revealOnFinish: true },
+  myself: { autoAdvance: false, resumesOnTurn: false, revealOnFinish: false },
 }
 
 export function behaviourFor(mode: ReadingMode): ModeBehaviour {
@@ -60,10 +68,9 @@ export function behaviourFor(mode: ReadingMode): ModeBehaviour {
 }
 
 /**
- * "Read to me" is the default because it is the one mode that works with nobody
- * else in the room, and a book opened by a child who cannot yet read has to do
- * something. It is also what the reader did before modes existed, so an update
- * does not change how a familiar book behaves.
+ * "Read to me" is the default because it is what the reader did before modes
+ * existed — press play and it reads on, turning the pages — so an update does not
+ * change how a familiar book behaves.
  */
 export const DEFAULT_READING_MODE: ReadingMode = 'to-me'
 

@@ -96,6 +96,17 @@ export function useReadAlong({
    */
   const pausedByReader = useRef(false)
 
+  /**
+   * Whether the spread on screen is the one the book opened at.
+   *
+   * The difference decides whether narration may carry on by itself, and the
+   * spread effect below cannot otherwise tell the two apart — mounting at spread 1
+   * and arriving at spread 2 look identical to it. It stays set through a run that
+   * bails for want of a player, since the next run is then still the first real
+   * one.
+   */
+  const atOpeningSpread = useRef(true)
+
   useEffect(() => {
     if (!archive || !book.hasMediaOverlays) return
     const player = new ReadAlongPlayer(archive, book, {
@@ -137,14 +148,25 @@ export function useReadAlong({
       return
     }
     let cancelled = false
-    // A mode that narrates picks up each new spread on its own — that is the
-    // difference between "the book reads to you" and "there is a play button".
+    /*
+     * Carry narration onto the new spread, unless the mode says a page turn ends
+     * it — which is what separates "Read myself" from the other two.
+     *
+     * Only ever a continuation. Nothing here starts a silent book talking: on the
+     * first spread of a freshly opened book the player is not playing and no page
+     * was turned, so every clause is false and it stays quiet until someone
+     * presses play. Opening a book that narrates itself was tried and is wrong —
+     * it gives nobody a moment to look at the page, and with auto-advance on it
+     * reads to the end whether or not anyone is listening.
+     */
     const resume =
       player.isPlaying ||
       keepReading.current ||
-      (mode.current !== null &&
-        behaviourFor(mode.current).narrates &&
+      (!atOpeningSpread.current &&
+        mode.current !== null &&
+        behaviourFor(mode.current).resumesOnTurn &&
         !pausedByReader.current)
+    atOpeningSpread.current = false
     keepReading.current = false
     player.pause()
     void player.setPages(pages).then((hasNarration) => {
@@ -156,30 +178,6 @@ export function useReadAlong({
       cancelled = true
     }
   }, [pages])
-
-  /**
-   * Whichever of the two arrives second -- the stored mode, or a spread that turns
-   * out to have narration -- starts the book off.
-   *
-   * The spread effect above resumes narration across a page turn, but on the very
-   * first spread there is nothing to resume *from*, and the mode it would consult
-   * may still be null. Which way that race falls depends on how long the book took
-   * to parse, so neither side can own the decision alone.
-   *
-   * Once only: after this, every spread is a page turn and the effect above has it.
-   * That also means changing the mode mid-book takes effect at the next page
-   * rather than restarting the page being read, which is the less startling of the
-   * two and costs a re-scan of the spread to avoid.
-   */
-  const started = useRef(false)
-  useEffect(() => {
-    if (started.current || !settings.mode || !available) return
-    started.current = true
-    const player = playerRef.current
-    if (!player || player.isPlaying || pausedByReader.current) return
-    if (!behaviourFor(settings.mode).narrates) return
-    void player.play()
-  }, [settings.mode, available])
 
   const onPageReady = useCallback((doc: Document, page: BookPage) => {
     playerRef.current?.registerDocument(page.index, doc)
