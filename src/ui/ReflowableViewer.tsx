@@ -10,6 +10,7 @@ import { BookmarkToggle, BookmarksSection } from './Bookmarks'
 import { ContentsSection } from './Contents'
 import { ReadingSupportSection } from './ReadingSupport'
 import { announceScreen } from '../reader/announce'
+import type { ReaderSettings } from '../store/settings'
 import { captureAnchor, screenForAnchor, screenForFragment } from '../reader/anchor'
 import { addBookmark, listBookmarks, removeBookmark, type Bookmark } from '../store/bookmarks'
 import { DEFAULT_TYPOGRAPHY, type ReaderFont, type ReaderTheme, type Typography } from '../reader/typography'
@@ -27,6 +28,9 @@ export interface ReflowableViewerProps {
   /** The element the reader left off at, when one was recorded. */
   initialAnchor?: number
   onPositionChange: (pageIndex: number, screen: number, anchor?: number) => void
+  /** The reader's own preferences, or `null` until they have been read back. */
+  settings: ReaderSettings | null
+  onSettingsChange: (patch: Partial<ReaderSettings>) => void
   onClose: () => void
 }
 
@@ -41,6 +45,8 @@ export function ReflowableViewer({
   initialScreen,
   initialAnchor,
   onPositionChange,
+  settings,
+  onSettingsChange,
   onClose,
 }: ReflowableViewerProps) {
   const [stageRef, frame] = useFrameSize<HTMLDivElement>()
@@ -53,7 +59,16 @@ export function ReflowableViewer({
   // The bars are drawn over the page; let them retire so it can be read whole.
   useChromeAutoHide(chromeVisible, () => setChromeVisible(false), menuOpen)
 
-  const [typography, setTypography] = useState<Typography>(DEFAULT_TYPOGRAPHY)
+  /*
+   * Owned by App, not here.
+   *
+   * Size and spacing are standing facts about whoever reads on this device -- the
+   * letter spacing a dyslexic child reads best at is not a per-book whim -- and
+   * holding them here meant they died with the book. They also decide how many
+   * screens a chapter measures to, so a value arriving after the first layout
+   * would re-measure and move the reader.
+   */
+  const typography = settings?.typography ?? DEFAULT_TYPOGRAPHY
 
   const inline = useMemo(
     () => (archive && !isVfsReady() ? new InlinePageResolver(archive) : undefined),
@@ -331,7 +346,7 @@ export function ReflowableViewer({
   )
 
   const set = <K extends keyof Typography>(key: K, value: Typography[K]): void =>
-    setTypography((current) => ({ ...current, [key]: value }))
+    onSettingsChange({ typography: { ...typography, [key]: value } })
 
   return (
     // Locked means a child is holding this, so the controls that remain grow to
@@ -465,10 +480,14 @@ export function ReflowableViewer({
               <button
                 key={value}
                 className={`chip${typography.letterSpacing === value ? ' chip-on' : ''}`}
-                onClick={() => {
-                  set('letterSpacing', value)
-                  setTypography((current) => ({ ...current, wordSpacing: value * 1.5 }))
-                }}
+                /* One update, not two: both land in the same stored object now,
+                   so a second call built from the same snapshot would discard the
+                   first. */
+                onClick={() =>
+                  onSettingsChange({
+                    typography: { ...typography, letterSpacing: value, wordSpacing: value * 1.5 },
+                  })
+                }
               >
                 {value === 0 ? 'Normal' : value === 0.06 ? 'Wider' : 'Widest'}
               </button>

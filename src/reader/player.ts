@@ -13,6 +13,7 @@
 import type { ZipArchive } from '../engine/zip/reader'
 import { mimeTypeFor } from '../engine/path'
 import { fragmentAt, parseSmil, DEFAULT_ACTIVE_CLASS, type OverlayFragment } from '../engine/overlays/smil'
+import { DEFAULT_HIGHLIGHT, highlightCss, type HighlightStrength } from './highlight'
 import type { BookPage, ParsedBook } from '../engine/types'
 
 /** Consecutive fragments that share one audio file. */
@@ -46,6 +47,8 @@ export class ReadAlongPlayer {
 
   readonly activeClass: string
 
+  private highlightStrength: HighlightStrength = DEFAULT_HIGHLIGHT
+
   constructor(
     private readonly archive: ZipArchive,
     book: ParsedBook,
@@ -59,6 +62,23 @@ export class ReadAlongPlayer {
 
   get isPlaying(): boolean {
     return this.playing
+  }
+
+  /**
+   * Restyle the spoken word, on the pages already open as well as the next ones.
+   *
+   * Re-applied rather than left for the next page load, because the reader has
+   * just been told this control affects the highlight and the highlighted page is
+   * in front of them. Waiting for a page turn would read as the setting not
+   * working.
+   */
+  set highlightStyle(value: HighlightStrength) {
+    if (value === this.highlightStrength) return
+    this.highlightStrength = value
+    for (const doc of this.documents.values()) {
+      doc.getElementById(FALLBACK_HIGHLIGHT_ID)?.remove()
+      this.ensureHighlightStyle(doc)
+    }
   }
 
   set rate(value: number) {
@@ -334,14 +354,15 @@ export class ReadAlongPlayer {
    */
   private ensureHighlightStyle(doc: Document): void {
     if (doc.getElementById(FALLBACK_HIGHLIGHT_ID)) return
-    if (definesClass(doc, this.activeClass)) return
+
+    const css = highlightCss(this.activeClass, this.highlightStrength, definesClass(doc, this.activeClass))
+    if (!css) return
 
     const style = doc.createElement('style')
     style.id = FALLBACK_HIGHLIGHT_ID
-    style.textContent = `.${CSS.escape(this.activeClass)} {
-      background: rgba(255, 180, 84, 0.45);
-      border-radius: 0.2em;
-    }`
+    style.textContent = css
+    // Last in the head, so a book that styles the class from its own stylesheet
+    // loses the tie on source order as well as on `!important`.
     ;(doc.head ?? doc.documentElement).appendChild(style)
   }
 }

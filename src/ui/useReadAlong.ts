@@ -3,6 +3,7 @@ import { ReadAlongPlayer } from '../reader/player'
 import type { ZipArchive } from '../engine/zip/reader'
 import type { BookPage, Direction, ParsedBook, Spread } from '../engine/types'
 import { behaviourFor, type ReadingMode } from '../reader/readingMode'
+import type { HighlightStrength } from '../reader/highlight'
 
 export interface ReadAlongSettings {
   rate: number
@@ -16,6 +17,8 @@ export interface ReadAlongSettings {
    * that a book's own parse comfortably outlasts.
    */
   mode: ReadingMode | null
+  /** How hard the spoken word should be to miss (SPEC.md §7.6). */
+  highlight: HighlightStrength
 }
 
 export interface ReadAlong {
@@ -136,6 +139,10 @@ export function useReadAlong({
   useEffect(() => {
     if (playerRef.current) playerRef.current.rate = settings.rate
   }, [settings.rate])
+
+  useEffect(() => {
+    if (playerRef.current) playerRef.current.highlightStyle = settings.highlight
+  }, [settings.highlight])
 
   const pages = useMemo(() => readingOrder(spread, direction), [spread, direction])
 

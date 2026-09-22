@@ -14,6 +14,7 @@ import {
 import type { ZipArchive } from '../engine/zip/reader'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import type { LayoutOverrides, ParsedBook } from '../engine/types'
+import { loadSettings, saveSettings, type ReaderSettings } from '../store/settings'
 
 interface Session {
   bookId: string
@@ -34,6 +35,40 @@ export function App() {
   const [loading, setLoading] = useState<BookLoading | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+
+  /*
+   * How this household reads, loaded once and owned above both viewers.
+   *
+   * Above them on purpose. These are the reader's preferences, not the book's, so
+   * they outlive a book being closed -- and loading them here means they are in
+   * hand before any book can be opened, since the shelf has to be looked at first.
+   * Loading inside the viewer instead made the stored value race the first spread,
+   * which for the reading mode decides whether a book starts talking and for
+   * typography decides how many screens a chapter measures to.
+   *
+   * `null` means "not read back yet", and the viewers treat it as "do nothing
+   * irreversible" rather than substituting a default.
+   */
+  const [settings, setSettings] = useState<ReaderSettings | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    void loadSettings().then((stored) => {
+      if (!cancelled) setSettings(stored)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const changeSettings = useCallback((patch: Partial<ReaderSettings>) => {
+    setSettings((current) => {
+      if (!current) return current
+      const next = { ...current, ...patch }
+      void saveSettings(next)
+      return next
+    })
+  }, [])
 
   useEffect(() => {
     // Best effort: without it, pages are inlined instead of served (SPEC.md §9.3).
@@ -238,6 +273,8 @@ export function App() {
         <ReflowableViewer
           bookId={session.bookId}
           book={session.book}
+          settings={settings}
+          onSettingsChange={changeSettings}
           archive={session.archive}
           initialPageIndex={session.initialPageIndex}
           initialScreen={session.initialScreen}
@@ -253,6 +290,8 @@ export function App() {
       <Viewer
         bookId={session.bookId}
         book={session.book}
+        settings={settings}
+        onSettingsChange={changeSettings}
         archive={session.archive}
         pdf={session.pdf}
         initialPageIndex={session.initialPageIndex}

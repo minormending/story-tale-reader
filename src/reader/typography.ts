@@ -133,3 +133,54 @@ export function screenCount(body: HTMLElement, frameWidth: number): number {
   if (frameWidth <= 0) return 1
   return Math.max(1, Math.round(body.scrollWidth / frameWidth))
 }
+
+/* ------------------------- reading it back ------------------------- */
+
+const FONTS: readonly ReaderFont[] = ['publisher', 'serif', 'sans']
+const THEME_NAMES: readonly ReaderTheme[] = ['publisher', 'paper', 'sepia', 'night']
+
+/** Bounds match what the menu can actually reach, so a stored value cannot exceed it. */
+const BOUNDS = {
+  fontScale: [0.8, 2.4],
+  lineHeight: [1.2, 2.2],
+  margin: [0, 120],
+  letterSpacing: [0, 0.2],
+  wordSpacing: [0, 0.4],
+} as const
+
+function num(value: unknown, [min, max]: readonly [number, number], fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? Math.min(max, Math.max(min, value))
+    : fallback
+}
+
+/**
+ * Typography as it comes back out of storage.
+ *
+ * Every field is taken apart rather than trusted as a whole, and a bad one falls
+ * back on its own without discarding the rest: a reader who had set a comfortable
+ * size should not lose it because a later version renamed a theme. Clamped rather
+ * than rejected, because a number outside the menu's range is still an intention
+ * — and an unclamped fontScale is a book rendered at 40em.
+ */
+export function asTypography(value: unknown): Typography {
+  const raw = (value ?? {}) as Partial<Record<keyof Typography, unknown>>
+  return {
+    fontScale: num(raw.fontScale, BOUNDS.fontScale, DEFAULT_TYPOGRAPHY.fontScale),
+    lineHeight: num(raw.lineHeight, BOUNDS.lineHeight, DEFAULT_TYPOGRAPHY.lineHeight),
+    margin: num(raw.margin, BOUNDS.margin, DEFAULT_TYPOGRAPHY.margin),
+    letterSpacing: num(raw.letterSpacing, BOUNDS.letterSpacing, DEFAULT_TYPOGRAPHY.letterSpacing),
+    wordSpacing: num(raw.wordSpacing, BOUNDS.wordSpacing, DEFAULT_TYPOGRAPHY.wordSpacing),
+    font: FONTS.includes(raw.font as ReaderFont) ? (raw.font as ReaderFont) : DEFAULT_TYPOGRAPHY.font,
+    theme: THEME_NAMES.includes(raw.theme as ReaderTheme)
+      ? (raw.theme as ReaderTheme)
+      : DEFAULT_TYPOGRAPHY.theme,
+  }
+}
+
+/** The three rates the menu offers; anything else came from somewhere else. */
+export const RATES = [0.75, 1, 1.25] as const
+
+export function asRate(value: unknown): number {
+  return RATES.includes(value as (typeof RATES)[number]) ? (value as number) : 1
+}

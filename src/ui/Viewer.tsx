@@ -15,7 +15,9 @@ import { BookmarkToggle, BookmarksSection } from './Bookmarks'
 import { ContentsSection } from './Contents'
 import { ReadingSupportSection } from './ReadingSupport'
 import { addBookmark, listBookmarks, removeBookmark, type Bookmark } from '../store/bookmarks'
-import { loadSettings, saveSettings } from '../store/settings'
+import type { ReaderSettings } from '../store/settings'
+import { DEFAULT_HIGHLIGHT, HIGHLIGHT_LABELS, HIGHLIGHT_STRENGTHS } from '../reader/highlight'
+import { RATES } from '../reader/typography'
 import { MODE_LABELS, READING_MODES } from '../reader/readingMode'
 import { announceSpread } from '../reader/announce'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
@@ -35,6 +37,9 @@ export interface ViewerProps {
   initialPageIndex: number
   overrides: LayoutOverrides
   onOverridesChange: (next: LayoutOverrides) => void
+  /** The reader's own preferences, or `null` until they have been read back. */
+  settings: ReaderSettings | null
+  onSettingsChange: (patch: Partial<ReaderSettings>) => void
   onPageIndexChange: (pageIndex: number) => void
   onClose: () => void
 }
@@ -48,6 +53,8 @@ export function Viewer({
   initialPageIndex,
   overrides,
   onOverridesChange,
+  settings,
+  onSettingsChange,
   onPageIndexChange,
   onClose,
 }: ViewerProps) {
@@ -140,25 +147,14 @@ export function Viewer({
   // In a right-to-left book the "next" page is to the left.
   const forward = book.direction === 'rtl' ? -1 : 1
 
-  // `mode: null` means "not read back yet", and the reader stays silent until it
-  // is. Starting at the default instead would have a book saved as "Read myself"
-  // narrate for as long as the lookup took.
-  const [readAlongSettings, setReadAlongSettings] = useState<ReadAlongSettings>({
-    rate: 1,
-    mode: null,
-  })
-
-  // How this household reads outlives the book, so it is read back rather than
-  // assumed.
-  useEffect(() => {
-    let cancelled = false
-    void loadSettings().then((stored) => {
-      if (!cancelled) setReadAlongSettings((current) => ({ ...current, mode: stored.readingMode }))
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [])
+  const readAlongSettings = useMemo<ReadAlongSettings>(
+    () => ({
+      rate: settings?.rate ?? 1,
+      mode: settings?.readingMode ?? null,
+      highlight: settings?.highlight ?? DEFAULT_HIGHLIGHT,
+    }),
+    [settings?.rate, settings?.readingMode, settings?.highlight],
+  )
 
   const readAlong = useReadAlong({
     book,
@@ -439,11 +435,11 @@ export function Viewer({
               <hr className="menu-rule" />
               <p className="menu-note">Read-along</p>
               <div className="menu-row">
-                {([0.75, 1, 1.25] as const).map((rate) => (
+                {RATES.map((rate) => (
                   <button
                     key={rate}
                     className={`chip${readAlongSettings.rate === rate ? ' chip-on' : ''}`}
-                    onClick={() => setReadAlongSettings((current) => ({ ...current, rate }))}
+                    onClick={() => onSettingsChange({ rate })}
                   >
                     {rate === 1 ? 'Normal' : `${rate}\u00d7`}
                   </button>
@@ -455,16 +451,29 @@ export function Viewer({
                     key={mode}
                     className={`mode${readAlongSettings.mode === mode ? ' mode-on' : ''}`}
                     aria-pressed={readAlongSettings.mode === mode}
-                    onClick={() => {
-                      setReadAlongSettings((current) => ({ ...current, mode }))
-                      void saveSettings({ readingMode: mode })
-                    }}
+                    onClick={() => onSettingsChange({ readingMode: mode })}
                   >
                     <span className="mode-name">{MODE_LABELS[mode].name}</span>
                     <span className="mode-hint">{MODE_LABELS[mode].hint}</span>
                   </button>
                 ))}
               </div>
+              <p className="menu-note">Word highlight</p>
+              <div className="menu-row">
+                {HIGHLIGHT_STRENGTHS.map((strength) => (
+                  <button
+                    key={strength}
+                    className={`chip${(settings?.highlight ?? 'book') === strength ? ' chip-on' : ''}`}
+                    aria-pressed={(settings?.highlight ?? 'book') === strength}
+                    onClick={() => onSettingsChange({ highlight: strength })}
+                  >
+                    {HIGHLIGHT_LABELS[strength]}
+                  </button>
+                ))}
+              </div>
+              <p className="menu-hint">
+                Use the stronger mark if the book&rsquo;s own highlight is hard to spot.
+              </p>
               <p className="menu-hint">Tap any word to hear it read from there.</p>
               <hr className="menu-rule" />
             </>

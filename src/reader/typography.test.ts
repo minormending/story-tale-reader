@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { DEFAULT_TYPOGRAPHY, reflowableStyles } from './typography'
+import { DEFAULT_TYPOGRAPHY, RATES, asRate, asTypography, reflowableStyles } from './typography'
 
 const frame = { width: 800, height: 600 }
 
@@ -38,5 +38,57 @@ describe('reflowableStyles spacing', () => {
   it('leaves code and preformatted text alone, where spacing carries meaning', () => {
     const css = reflowableStyles(frame, { ...DEFAULT_TYPOGRAPHY, letterSpacing: 0.12 })
     expect(css).toContain('body *:not(code):not(pre)')
+  })
+})
+
+describe('asTypography', () => {
+  it('takes a whole stored set at its word', () => {
+    const stored = {
+      fontScale: 1.45,
+      lineHeight: 1.8,
+      margin: 48,
+      letterSpacing: 0.06,
+      wordSpacing: 0.09,
+      font: 'serif',
+      theme: 'sepia',
+    }
+    expect(asTypography(stored)).toEqual(stored)
+  })
+
+  it('falls back field by field, keeping the ones that survived', () => {
+    // A reader who had set a comfortable size should not lose it because a later
+    // version renamed a theme.
+    const out = asTypography({ fontScale: 1.45, theme: 'lagoon', font: 'comic' })
+    expect(out.fontScale).toBe(1.45)
+    expect(out.theme).toBe(DEFAULT_TYPOGRAPHY.theme)
+    expect(out.font).toBe(DEFAULT_TYPOGRAPHY.font)
+  })
+
+  it('clamps rather than rejects a number outside the menu', () => {
+    // Out of range is still an intention; an unclamped fontScale is a book at 40em.
+    expect(asTypography({ fontScale: 99 }).fontScale).toBe(2.4)
+    expect(asTypography({ fontScale: -5 }).fontScale).toBe(0.8)
+    expect(asTypography({ letterSpacing: 10 }).letterSpacing).toBe(0.2)
+  })
+
+  it('refuses values that are not numbers at all', () => {
+    for (const junk of [NaN, Infinity, '1.4', null, {}]) {
+      expect(asTypography({ fontScale: junk }).fontScale).toBe(DEFAULT_TYPOGRAPHY.fontScale)
+    }
+  })
+
+  it('returns the defaults for nothing at all', () => {
+    expect(asTypography(undefined)).toEqual(DEFAULT_TYPOGRAPHY)
+    expect(asTypography(null)).toEqual(DEFAULT_TYPOGRAPHY)
+  })
+})
+
+describe('asRate', () => {
+  it('accepts the rates the menu offers', () => {
+    for (const rate of RATES) expect(asRate(rate)).toBe(rate)
+  })
+
+  it('refuses anything else, including plausible-looking speeds', () => {
+    for (const junk of [0, 2, 1.5, '1', null, undefined, NaN]) expect(asRate(junk)).toBe(1)
   })
 })

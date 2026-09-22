@@ -15,13 +15,27 @@
 
 import { get, put, STORE_SETTINGS } from './idb'
 import { asReadingMode, DEFAULT_READING_MODE, type ReadingMode } from '../reader/readingMode'
+import {
+  asHighlightStrength,
+  DEFAULT_HIGHLIGHT,
+  type HighlightStrength,
+} from '../reader/highlight'
+import { asRate, asTypography, DEFAULT_TYPOGRAPHY, type Typography } from '../reader/typography'
 
 export interface ReaderSettings {
   readingMode: ReadingMode
+  /** Size, typeface, colours and spacing for reflowable books. */
+  typography: Typography
+  /** Narration speed. */
+  rate: number
+  highlight: HighlightStrength
 }
 
 export const DEFAULT_SETTINGS: ReaderSettings = {
   readingMode: DEFAULT_READING_MODE,
+  typography: DEFAULT_TYPOGRAPHY,
+  rate: 1,
+  highlight: DEFAULT_HIGHLIGHT,
 }
 
 /** One row; there is only ever one reader's worth of preferences on a device. */
@@ -42,7 +56,14 @@ interface StoredSettings extends Partial<ReaderSettings> {
 export async function loadSettings(): Promise<ReaderSettings> {
   try {
     const stored = await get<StoredSettings>(STORE_SETTINGS, SETTINGS_ID)
-    return { readingMode: asReadingMode(stored?.readingMode) }
+    // Field by field, so one unreadable preference does not cost the reader the
+    // others -- the spacing a child reads best at should survive a renamed theme.
+    return {
+      readingMode: asReadingMode(stored?.readingMode),
+      typography: asTypography(stored?.typography),
+      rate: asRate(stored?.rate),
+      highlight: asHighlightStrength(stored?.highlight),
+    }
   } catch {
     return { ...DEFAULT_SETTINGS }
   }
