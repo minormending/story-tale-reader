@@ -28,6 +28,14 @@ export interface ReadAlong {
   toggle: () => void
   /** Play the spread on screen again from its first word. */
   replay: () => void
+  /**
+   * Say one word again, from the word list (§7.6).
+   *
+   * Takes the page as well as the element because the word may be on a spread
+   * that is not up yet: the caller turns to it and asks in the same breath, and
+   * the request waits for the spread rather than being timed against it.
+   */
+  speak: (pageIndex: number, elementId: string) => void
   stop: () => void
   onPageReady: (doc: Document, page: BookPage) => void
   /** True when a tap landed on a word the narration can jump to. */
@@ -50,6 +58,7 @@ export function useReadAlong({
   settings,
   onFinishedSpread,
   onWaitingForReader,
+  onWordTapped,
 }: {
   book: ParsedBook
   archive: ZipArchive | undefined
@@ -64,6 +73,13 @@ export function useReadAlong({
    * turns the page is already there when the grown-up has finished talking.
    */
   onWaitingForReader?: () => void
+  /** A narrated word was tapped, for the word list offered after the book (§7.6). */
+  onWordTapped?: (word: {
+    text: string
+    pageIndex: number
+    elementId: string
+    order: number
+  }) => void
 }): ReadAlong {
   const [playing, setPlaying] = useState(false)
   const [available, setAvailable] = useState(false)
@@ -89,6 +105,9 @@ export function useReadAlong({
   const waiting = useRef(onWaitingForReader)
   waiting.current = onWaitingForReader
 
+  const tapped = useRef(onWordTapped)
+  tapped.current = onWordTapped
+
   /**
    * The reader pressed pause, as opposed to narration simply running out.
    *
@@ -98,6 +117,16 @@ export function useReadAlong({
    * have it start talking again because they turned a page.
    */
   const pausedByReader = useRef(false)
+
+  /**
+   * A word asked for before the spread holding it had finished mounting.
+   *
+   * The word list turns the page and asks in one action, so the request usually
+   * arrives while the new spread's overlays are still being read. Holding it and
+   * firing when the pages are ready beats guessing at a delay, which is wrong on
+   * a slow tablet in exactly the direction that matters.
+   */
+  const pendingWord = useRef<{ pageIndex: number; elementId: string } | null>(null)
 
   /**
    * Whether anybody has actually started this book reading.
@@ -121,6 +150,7 @@ export function useReadAlong({
     if (!archive || !book.hasMediaOverlays) return
     const player = new ReadAlongPlayer(archive, book, {
       onStateChange: setPlaying,
+      onWordTapped: (word) => tapped.current?.(word),
       onFinished: () => {
         // A finished spread with no mode yet cannot have been started by one.
         if (!mode.current) return
@@ -186,6 +216,15 @@ export function useReadAlong({
     void player.setPages(pages).then((hasNarration) => {
       if (cancelled) return
       setAvailable(hasNarration)
+
+      const wanted = pendingWord.current
+      if (wanted && pages.some((page) => page.index === wanted.pageIndex)) {
+        pendingWord.current = null
+        hasPlayed.current = true
+        void player.seekToFragment(wanted.pageIndex, wanted.elementId)
+        return
+      }
+
       if (hasNarration && resume) void player.play()
     })
     return () => {
@@ -213,6 +252,19 @@ export function useReadAlong({
     void playerRef.current?.restart()
   }, [])
 
+  /** Say one word again, waiting for its spread if the page is still turning. */
+  const speak = useCallback((pageIndex: number, elementId: string) => {
+    const player = playerRef.current
+    if (!player) return
+    pausedByReader.current = false
+    if (pages.some((page) => page.index === pageIndex)) {
+      hasPlayed.current = true
+      void player.seekToFragment(pageIndex, elementId)
+      return
+    }
+    pendingWord.current = { pageIndex, elementId }
+  }, [pages])
+
   const stop = useCallback(() => {
     keepReading.current = false
     pausedByReader.current = true
@@ -224,5 +276,5 @@ export function useReadAlong({
     [],
   )
 
-  return { available, playing, toggle, replay, stop, onPageReady, claimsTap }
+  return { available, playing, toggle, replay, speak, stop, onPageReady, claimsTap }
 }

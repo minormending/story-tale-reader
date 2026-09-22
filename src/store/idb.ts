@@ -7,7 +7,7 @@
  */
 
 const DB_NAME = 'story-tale-reader'
-const DB_VERSION = 4
+const DB_VERSION = 5
 
 export const STORE_BOOKS = 'books'
 export const STORE_PROGRESS = 'progress'
@@ -18,6 +18,8 @@ export const STORE_BOOKMARKS = 'bookmarks'
 export const STORE_LAYOUT = 'layout'
 /** Preferences that belong to the reader rather than to any one book. */
 export const STORE_SETTINGS = 'settings'
+/** Words a child tapped to hear again, per book (SPEC.md §7.6). */
+export const STORE_WORDS = 'words'
 
 let connection: Promise<IDBDatabase> | undefined
 
@@ -36,6 +38,7 @@ export function openDatabase(): Promise<IDBDatabase> {
         STORE_BOOKMARKS,
         STORE_LAYOUT,
         STORE_SETTINGS,
+        STORE_WORDS,
       ]) {
         if (!db.objectStoreNames.contains(name)) db.createObjectStore(name, { keyPath: 'id' })
       }

@@ -115,14 +115,20 @@ here.
    up so the grown-up has the page-turn control to hand — the one direct answer in
    this list to the largest effect anybody measured. Reading still begins with
    play in every mode. See SPEC.md §7.3.
-5. **A word list after the book.** The words the child tapped during reading,
-   offered at the end — vocabulary support at the moment the evidence says it is
-   free.
+5. **A word list after the book — built.** The words the child tapped during
+   reading, offered at the end. The list is reachable only on the last spread,
+   because a list that can be opened mid-story is the in-story dictionary this
+   very table argues against. See SPEC.md §7.6.
 6. **Highlight strength — built.** An override for books whose own active-class
    styling is too faint to notice, given where children actually look. The book's
    own styling stays the default; "Stronger" overrides it. See SPEC.md §7.5.
 
-Numbers 1–4 and 6 are built. Number 5 needs design thought first.
+All six are built.
+
+What the list cost, for the record: almost nothing new. The reader could already
+speak a tapped word, so the feature is one store, one restriction on when it
+appears, and the decision not to add a dictionary — which is the part the evidence
+actually asked for.
 
 Worth recording what number 4 cost, because it argues for doing 5 and 6: the
 behaviour was almost entirely already there. What was missing was a name for it.

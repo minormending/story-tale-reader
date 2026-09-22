@@ -569,7 +569,42 @@ fallback handles it, including the leading-digit case that needs a hex escape
 rather than a backslash: `.2hot` is invalid and the whole rule is dropped, so the
 highlight would silently do nothing on exactly the devices least able to spare it.
 
-### 7.6 Clock values
+### 7.6 Words asked about
+
+**Built.** A child can already tap any word to hear it (§7.1), and a tap is a small
+confession: this is the word I did not catch. Those words are collected silently
+and offered as a list **once the book is finished**.
+
+The timing is the feature, not a detail of it. In-story dictionaries are one of the
+few enhancements the meta-analyses agree on, and they disagree with themselves: a
+dictionary *hurt* comprehension and *helped* vocabulary
+(`docs/child-reading-research.md`). Those findings are not in conflict — they say
+*when*, not *whether*. Words looked at after the book costs the story nothing.
+
+So the list lives in the reading menu and appears only on the last spread. Both
+restrictions are deliberate: a list reachable mid-story is the in-story dictionary
+the evidence argues against, and a card over the final spread is a panel covering
+a picture book, which is the opposite of what this reader is for.
+
+- Only narrated words count. A tap the narration can answer means "say that
+  again"; a tap on unnarrated furniture means nothing.
+- Repeats raise a count rather than adding a row, since the difference between
+  misheard once and hard three times is the useful part.
+- Sorted by position in the narration, which is reading order. Sorting by page and
+  breaking ties any other way is not: every word on a spread shares a page, so
+  "Once upon a" came out as "a, Once, upon".
+- Capped at 60, past which tapping has stopped meaning "I did not catch that".
+- Tapping a word turns back to it and says it again. There is no definition: this
+  reader has no dictionary, and inventing one would be guessing at the book.
+
+Jumping to a word exposed a fault worth recording. Narration can reach a word
+before the page holding it is on screen — the seek runs as soon as the overlays are
+read, while the iframe is still loading — and the player keeps one document per page
+index, dropped only when it is destroyed. The word was therefore marked in a
+detached document from an earlier visit: audibly right, visibly nothing. The
+highlight is now re-applied when a page registers.
+
+### 7.7 Clock values
 
 SMIL clock parsing must handle `00:02:23.297`, `02:23.297`, `23.297s`, `2.5min`,
 `1h`, and bare seconds. Small, fully unit-tested module.

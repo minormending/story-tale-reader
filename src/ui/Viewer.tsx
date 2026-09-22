@@ -14,6 +14,9 @@ import { LockButton } from './LockButton'
 import { BookmarkToggle, BookmarksSection } from './Bookmarks'
 import { ContentsSection } from './Contents'
 import { ReadingSupportSection } from './ReadingSupport'
+import { WordListSection } from './WordList'
+import { clearWords, loadWords, recordTap } from '../store/words'
+import type { TappedWord } from '../reader/wordList'
 import { addBookmark, listBookmarks, removeBookmark, type Bookmark } from '../store/bookmarks'
 import type { ReaderSettings } from '../store/settings'
 import { DEFAULT_HIGHLIGHT, HIGHLIGHT_LABELS, HIGHLIGHT_STRENGTHS } from '../reader/highlight'
@@ -166,6 +169,7 @@ export function Viewer({
     // "Read together" ends each page with a grown-up about to turn it. The bars
     // hide themselves after three seconds, so without this the control they need
     // is behind a tap on an empty-looking page.
+    onWordTapped: (word) => void recordTap(bookId, word).then(setWords),
     onWaitingForReader: () => {
       setChromeVisible(true)
       setWaitingForReader(true)
@@ -254,6 +258,24 @@ export function Viewer({
   /* ------------------------------ bookmarks ------------------------------ */
 
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([])
+
+  /*
+   * Words tapped during this book, for the list offered once it is over (§7.6).
+   *
+   * Collected always and shown only at the end: the collecting is silent, and it
+   * is the *showing* that the research puts a cost on.
+   */
+  const [words, setWords] = useState<TappedWord[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+    void loadWords(bookId).then((stored) => {
+      if (!cancelled) setWords(stored)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [bookId])
   useEffect(() => {
     void listBookmarks(bookId).then(setBookmarks)
   }, [bookId])
@@ -477,6 +499,22 @@ export function Viewer({
               <p className="menu-hint">Tap any word to hear it read from there.</p>
               <hr className="menu-rule" />
             </>
+          )}
+
+          {/* Only on the last spread. A list reachable mid-story is exactly the
+              in-story dictionary the evidence argues against (§7.6). */}
+          {spreadIndex === spreads.length - 1 && (
+            <WordListSection
+              words={words}
+              onJump={(word) => {
+                setPageIndex(word.pageIndex)
+                setMenuOpen(false)
+                // Asked in the same breath as the turn; the hook holds it until
+                // the spread is up rather than being timed against it.
+                readAlong.speak(word.pageIndex, word.elementId)
+              }}
+              onForget={() => void clearWords(bookId).then(() => setWords([]))}
+            />
           )}
 
           <ReadingSupportSection book={book} />

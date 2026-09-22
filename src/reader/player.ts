@@ -26,6 +26,26 @@ export interface PlayerCallbacks {
   onStateChange: (playing: boolean) => void
   /** Fired when the current spread's narration finishes. */
   onFinished: () => void
+  /**
+   * A reader tapped a narrated word.
+   *
+   * Only narrated words are reported, which is what makes the signal worth
+   * keeping: tapping a word to hear it again says "I did not catch that one",
+   * where a tap on unnarrated furniture says nothing at all.
+   */
+  onWordTapped?: (word: {
+    text: string
+    pageIndex: number
+    elementId: string
+    /**
+     * Position in the book's narration, counted across segments.
+     *
+     * Reading order, which page index alone is not: every word on a spread shares
+     * a page, and ordering the list by anything else within it turns "Once upon a"
+     * into "a, Once, upon".
+     */
+    order: number
+  }) => void
 }
 
 const FALLBACK_HIGHLIGHT_ID = 'story-tale-highlight-fallback'
@@ -92,6 +112,25 @@ export class ReadAlongPlayer {
     this.documents.set(pageIndex, doc)
     this.ensureHighlightStyle(doc)
     doc.addEventListener('click', this.onDocumentClick)
+    this.reapplyHighlight(pageIndex)
+  }
+
+  /**
+   * Put the highlight back on a page that has only just arrived.
+   *
+   * Narration can reach a word before the page holding it is on screen, and
+   * jumping to a word does exactly that: the seek runs as soon as the overlays are
+   * read, while the iframe is still loading. The word was then marked in whatever
+   * document this page index held before -- a detached one from an earlier visit,
+   * since documents are only dropped when the player is destroyed -- so the
+   * narration was audibly right and visibly nothing.
+   */
+  private reapplyHighlight(pageIndex: number): void {
+    if (this.activeFragment < 0) return
+    const fragment = this.segments[this.segmentIndex]?.fragments[this.activeFragment]
+    if (!fragment) return
+    if (this.pageByPath.get(fragment.textPath) !== pageIndex) return
+    this.highlight(fragment)
   }
 
   unregisterDocument(pageIndex: number): void {
@@ -344,6 +383,20 @@ export class ReadAlongPlayer {
 
     const element = target.closest('[id]')
     if (!element?.id) return
+    // Locate first: a tap that no narration answers is not a word being asked
+    // about, and `seekToFragment` would ignore it too.
+    const found = this.locate(pageIndex, element.id)
+    if (!found) return
+
+    let order = found.index
+    for (let s = 0; s < found.segment; s++) order += this.segments[s]!.fragments.length
+
+    this.callbacks.onWordTapped?.({
+      text: element.textContent ?? '',
+      pageIndex,
+      elementId: element.id,
+      order,
+    })
     void this.seekToFragment(pageIndex, element.id)
   }
 
