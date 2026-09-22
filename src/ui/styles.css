@@ -379,7 +379,13 @@ button { font: inherit; cursor: pointer; }
   min-height: 48px;
   text-align: left;
 }
-.mode:hover { background: var(--hover-strong); }
+/* Unselected only. `.mode:hover` is (0,2,0) and `.mode-on` is (0,1,0), so plain
+   `:hover` out-specified the selected state and replaced its amber fill while
+   leaving the amber-ink text on top -- dark brown on a faint grey, which axe put
+   at serious. A pointer resting on the mode you just chose is the normal case, not
+   an edge one. Caught by the audit; missed locally because a scripted click
+   produces no hover. */
+.mode:not(.mode-on):hover { background: var(--hover-strong); }
 /* Border as well as fill: the chosen mode has to survive being looked at on a
    dim tablet in a dark room, which is where this app gets used. */
 .mode-on {
