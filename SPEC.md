@@ -543,7 +543,33 @@ screen, naming the chapter only when it changes.
 Hidden with `opacity: 0` rather than `visibility: hidden` or `display: none`, both
 of which would remove it from the accessibility tree and silence the announcement.
 
-### 7.5 Clock values
+### 7.5 Word highlight strength
+
+**Built.** The reader adds and removes the book's own `media:active-class` and lets
+the publisher's stylesheet decide what that looks like (§7.1). That stays the
+default, because the book was designed and a reader that repaints it is guessing.
+
+It does mean a book that styles its highlight faintly gets a faint result.
+Eye-tracking of pre-K children found they spend **82%** of fixations on the pictures
+and **16%** on the text, and about half of those text fixations coincided with the
+synchronised cue — so a highlight that is easy to miss is doing very little of the
+work it exists for.
+
+"Stronger" overrides the book: amber block, near-black ink, `!important`, and last
+in the head so it wins on source order too. A rule the book could out-specify would
+be no answer to the only complaint that leads anybody to this control. It forces
+the ink as well as the fill — a book that highlights by turning the word white
+would be unreadable on the block otherwise. Re-applied to the pages already open,
+not just the next ones, since the highlighted page is in front of the reader when
+they change it.
+
+The selector escapes the class name, which is publisher input from the OPF. Where
+`CSS.escape` is missing — the older Android WebViews this targets (§9.3) — a
+fallback handles it, including the leading-digit case that needs a hex escape
+rather than a backslash: `.2hot` is invalid and the whole rule is dropped, so the
+highlight would silently do nothing on exactly the devices least able to spare it.
+
+### 7.6 Clock values
 
 SMIL clock parsing must handle `00:02:23.297`, `02:23.297`, `23.297s`, `2.5min`,
 `1h`, and bare seconds. Small, fully unit-tested module.
@@ -568,6 +594,32 @@ pinch-zoom, thumbnails. Text layer for selection/search. No read-along.
 ---
 
 ## 9. Storage, offline, and the PWA
+
+
+### 9.0 Reader preferences
+
+**Built.** One row in a `settings` store (DB v4) holding what belongs to the reader
+rather than to any book: reading mode (§7.3), typography, narration rate and
+highlight strength (§7.5). Distinct from `LayoutOverrides`, which is per book and
+about that file's own quirks — a mispaired spread is a fact about an EPUB, how a
+household reads is not.
+
+Everything adjustable used to live in component state and die when the book closed.
+That is worst for the setting with evidence behind it: the letter spacing a
+dyslexic child reads best at is a standing fact about that child, and re-setting it
+every bedtime is what stops a setting being used at all.
+
+Owned by `App`, above both viewers, which removes a race rather than managing it.
+Loaded inside a viewer, the stored value competed with the first render — for the
+reading mode that decided whether a book started narrating, and typography decides
+how many screens a chapter measures to, so a late arrival re-measures and moves the
+reader. Above them, the values are in hand before a book can be opened, because the
+shelf has to be looked at first.
+
+Read back field by field and clamped rather than rejected: one unreadable
+preference should not cost the reader the others, and a number outside the menu's
+range is still an intention — though an unclamped `fontScale` is a book rendered at
+40em.
 
 ### 9.1 Storage
 

@@ -118,10 +118,11 @@ here.
 5. **A word list after the book.** The words the child tapped during reading,
    offered at the end — vocabulary support at the moment the evidence says it is
    free.
-6. **Highlight strength.** An override for books whose own active-class styling is
-   too faint to notice, given where children actually look.
+6. **Highlight strength — built.** An override for books whose own active-class
+   styling is too faint to notice, given where children actually look. The book's
+   own styling stays the default; "Stronger" overrides it. See SPEC.md §7.5.
 
-Numbers 1–4 are built. Numbers 5 and 6 need design thought first.
+Numbers 1–4 and 6 are built. Number 5 needs design thought first.
 
 Worth recording what number 4 cost, because it argues for doing 5 and 6: the
 behaviour was almost entirely already there. What was missing was a name for it.
