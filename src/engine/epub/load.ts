@@ -217,7 +217,7 @@ export async function loadEpub(
   })
 
   /*
-   * Do the book's pictures carry any description? (docs/accessibility.md)
+   * Do the book's pictures carry any description? (SPEC.md §11.1)
    *
    * Bounded to the same sample the layout detector uses, and skipped entirely on
    * the deferred path, because this runs while somebody is waiting for a book to

@@ -528,7 +528,22 @@ both when narration runs out and when someone presses pause, so the two are trac
 apart. A mode that narrates picks up the next spread on its own; a reader who
 silenced the book does not have it start talking again because they turned a page.
 
-### 7.4 Clock values
+### 7.4 Announcements
+
+**Built.** The reader had no live regions at all: a screen reader user turned the
+page and heard nothing. The toolbar's "3 / 12" cannot do the job — it reads as
+"three slash twelve", and it retires after three seconds (§6.2), so for most of a
+book there is nothing on screen to attach a live region to.
+
+A polite, atomic live region announces each spread, preferring the labels the book
+prints over the position in the spine: "go back to page six" means the printed six,
+which in a picture book is rarely the sixth file. Reflowable books announce the
+screen, naming the chapter only when it changes.
+
+Hidden with `opacity: 0` rather than `visibility: hidden` or `display: none`, both
+of which would remove it from the accessibility tree and silence the announcement.
+
+### 7.5 Clock values
 
 SMIL clock parsing must handle `00:02:23.297`, `02:23.297`, `23.297s`, `2.5min`,
 `1h`, and bare seconds. Small, fully unit-tested module.
@@ -610,6 +625,48 @@ Visual correctness is the entire product, so the test strategy is weighted towar
 - Synthetic FXL fixtures we author, covering: no spread metadata; explicit `page-spread-*`; RTL; mixed viewports; pre-composed spread pages; missing viewport; media overlays.
 - Public-domain FXL books.
 - **The Amelia Bedelia file is the primary dev target but must NOT be committed** — it's in copyright. Keep it in a gitignored `corpus/local/`, and encode its *structure* as a synthetic fixture.
+
+---
+
+### 11.1 Accessibility
+
+Audited, but note the boundary: `a11yExclude` holds `.page-frame` and
+`.reflow-frame`, so axe checks the reader and never the book inside it. "The audit
+is green" is therefore a statement about the shell. The book is the publisher's,
+and the reader's job is to report on it rather than to vouch for it.
+
+**Built**
+
+- Every state runs axe-core across four device profiles in both colour schemes, and
+  blocks the release on critical/serious.
+- Keyboard paging survives focus entering a page iframe (`usePageKeys`), which is
+  otherwise one Tab press away from breaking every shortcut.
+- Auto-hiding chrome holds for `:focus-visible`, so a keyboard user is never left
+  on a control at zero opacity.
+- `prefers-reduced-motion` honoured, including a blanket animation and transition
+  stop.
+- Page changes are announced (§7.4). Before this there were no live regions in the
+  reader at all: turning a page said nothing.
+- `dc:language` reaches each page document, so a French book is not pronounced in
+  the interface's voice. Never over a page that declares its own, since
+  dual-language picture books are common.
+- "About this book" reports what a book will and will not do — narration from
+  evidence, pictures from counting text alternatives, and the publisher's
+  `schema:*` claims marked as claims.
+
+**Known gaps**
+
+- *Image descriptions cannot be supplied.* In a fixed-layout picture book the
+  illustration is the page. If the publisher describes nothing, a child using a
+  screen reader gets a titled empty frame, and no amount of work here produces the
+  missing words. The reader reports the gap; it cannot close it.
+- *The menu is `role="group"`, not a dialog.* No focus trap, and focus is neither
+  moved into it on open nor returned on close.
+- *Touch targets are adult-sized outside lock mode.* 44–48px throughout, against
+  the ~2cm (76px) that `docs/child-reading-research.md` asks for. Lock mode is the
+  one place sized for a child, which is the case it exists for (§6.2).
+- *No stated conformance target.* Nothing here claims WCAG 2.2 AA; the checks are
+  a floor the project chose, not an audited standard.
 
 ---
 
