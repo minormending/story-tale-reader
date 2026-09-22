@@ -100,15 +100,22 @@ export function useReadAlong({
   const pausedByReader = useRef(false)
 
   /**
-   * Whether the spread on screen is the one the book opened at.
+   * Whether anybody has actually started this book reading.
    *
-   * The difference decides whether narration may carry on by itself, and the
-   * spread effect below cannot otherwise tell the two apart — mounting at spread 1
-   * and arriving at spread 2 look identical to it. It stays set through a run that
-   * bails for want of a player, since the next run is then still the first real
-   * one.
+   * Carrying narration onto a new spread is a property of reading that is already
+   * under way, and this is the only thing that establishes it. The obvious test —
+   * "is this the spread the book opened at?" — looked equivalent and is not: the
+   * spread effect runs again whenever the spread changes for any reason, including
+   * being moved to the saved reading position just after mount, and that second run
+   * would read as a page turn and start a silent book talking.
+   *
+   * It was hidden for a while by an accident. The reading mode used to be loaded
+   * inside the viewer, so it was still null for the first few renders and the
+   * resume clause could not fire; moving settings above the viewer removed that
+   * window and the fault appeared at once. The audit caught it both times, in the
+   * same two states.
    */
-  const atOpeningSpread = useRef(true)
+  const hasPlayed = useRef(false)
 
   useEffect(() => {
     if (!archive || !book.hasMediaOverlays) return
@@ -129,6 +136,7 @@ export function useReadAlong({
       },
     })
     playerRef.current = player
+    hasPlayed.current = false
     return () => {
       player.destroy()
       playerRef.current = null
@@ -169,11 +177,10 @@ export function useReadAlong({
     const resume =
       player.isPlaying ||
       keepReading.current ||
-      (!atOpeningSpread.current &&
+      (hasPlayed.current &&
         mode.current !== null &&
         behaviourFor(mode.current).resumesOnTurn &&
         !pausedByReader.current)
-    atOpeningSpread.current = false
     keepReading.current = false
     player.pause()
     void player.setPages(pages).then((hasNarration) => {
@@ -194,6 +201,7 @@ export function useReadAlong({
     const player = playerRef.current
     if (!player) return
     pausedByReader.current = player.isPlaying
+    if (!player.isPlaying) hasPlayed.current = true
     void player.toggle()
   }, [])
 
@@ -201,6 +209,7 @@ export function useReadAlong({
   const replay = useCallback(() => {
     // Asking to hear it again is asking for sound, whatever was pressed before.
     pausedByReader.current = false
+    hasPlayed.current = true
     void playerRef.current?.restart()
   }, [])
 
