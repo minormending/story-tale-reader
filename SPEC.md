@@ -784,10 +784,21 @@ and the reader's job is to report on it rather than to vouch for it.
   an explanation rather than rendered as rubbish. Uncompressed and PalmDOC-compressed
   books, which includes all KF8/AZW3, work. Implementing HUFF/CDIC without a sample
   file to verify against would have meant shipping unverifiable bit-twiddling.
-- **The Android intent handling has not run on a physical device.** It compiles in CI
-  and the plugin is present in the APK, but "Open with" from a file manager is
-  unverified until someone installs the build. Everything else is web code that has
-  been exercised running.
+- ~~**The Android intent handling has not run on a physical device.**~~ **Exercised on
+  a Galaxy Tab A7 Lite** (Android 14) by the device lab in story-tale-android, cold and
+  warm, for "Open with" by type and for Share. Running it found two faults, both fixed:
+  - Books crossed the Capacitor bridge as base64, which held several copies of the whole
+    book in the Java heap. Anything over about 40 MB threw OutOfMemoryError, and the
+    reader swallowed the rejection, so "Open with" silently did nothing. Books are now
+    streamed to the app's cache natively and fetched from there. An 83 MB book opens in
+    about 7 s, and any failure is shown.
+  - The octet-stream filter's `pathPattern` did not match names with an earlier dot
+    ("My.Book.epub"), because Android's path globs do not backtrack. The filter now
+    carries one pattern per number of dots.
+
+  Still unverified: delivery from a real file manager's content provider. The lab can
+  check that the filter matches such a URI, but cannot hold the grant a file manager
+  gives.
 - ~~**Bookmarks**~~ **Built.** A toggle in the reader's toolbar and a list in its
   menu; removing a book takes its bookmarks with it.
 - **Pinch-zoom and lock mode are exercised by emulated touch, not by a real
