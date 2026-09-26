@@ -5,7 +5,6 @@ import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
 import android.provider.DocumentsContract;
-import android.util.Base64;
 
 import androidx.activity.result.ActivityResult;
 
@@ -17,8 +16,7 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
-import java.io.ByteArrayOutputStream;
-import java.io.InputStream;
+import java.io.File;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -33,11 +31,9 @@ import java.util.Locale;
  * Access Framework does, and only native code can reach it.
  *
  * Two steps on purpose. Picking returns a *list* — name, size and a document URI
- * per book — which is cheap whatever the folder holds. Reading returns one book's
- * bytes, base64-encoded, and is called once per book as the import reaches it.
- * Handing forty books across the bridge at once would mean forty files in memory
- * simultaneously, which on the cheap tablets this reader is for is an
- * out-of-memory kill rather than a slow import.
+ * per book — which is cheap whatever the folder holds. Reading copies one book into
+ * the cache and returns its path (see IncomingFiles), and is called once per book as
+ * the import reaches it, so a folder of forty books never has forty in flight.
  */
 @CapacitorPlugin(name = "FolderPicker")
 public class FolderPickerPlugin extends Plugin {
@@ -50,8 +46,6 @@ public class FolderPickerPlugin extends Plugin {
 
     /** Calibre nests author/title/book; a handful of levels is plenty. */
     private static final int MAX_DEPTH = 8;
-
-    private static final long MAX_BYTES = 150L * 1024 * 1024;
 
     @PluginMethod
     public void pick(PluginCall call) {
@@ -154,7 +148,10 @@ public class FolderPickerPlugin extends Plugin {
         return false;
     }
 
-    /** One book's bytes, for the import to take when it gets to it. */
+    /**
+     * One book, for the import to take when it gets to it: streamed into the cache
+     * and handed over as a path, like BookIntentPlugin, rather than as base64.
+     */
     @PluginMethod
     public void read(PluginCall call) {
         String raw = call.getString("uri");
@@ -162,35 +159,22 @@ public class FolderPickerPlugin extends Plugin {
             call.reject("No book was named");
             return;
         }
-
-        try {
-            Uri uri = Uri.parse(raw);
-            ContentResolver resolver = getContext().getContentResolver();
-            try (InputStream stream = resolver.openInputStream(uri)) {
-                if (stream == null) {
-                    call.reject("That book could not be opened");
-                    return;
-                }
-
-                ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-                byte[] chunk = new byte[64 * 1024];
-                long total = 0;
-                int read;
-                while ((read = stream.read(chunk)) != -1) {
-                    total += read;
-                    if (total > MAX_BYTES) {
-                        call.reject("That book is too large to open on this device");
-                        return;
-                    }
-                    buffer.write(chunk, 0, read);
-                }
-
+        new Thread(() -> {
+            try {
+                File copy = IncomingFiles.copy(getContext(), Uri.parse(raw));
                 JSObject out = new JSObject();
-                out.put("data", Base64.encodeToString(buffer.toByteArray(), Base64.NO_WRAP));
+                out.put("path", copy.getAbsolutePath());
+                out.put("size", copy.length());
                 call.resolve(out);
+            } catch (Exception failure) {
+                call.reject("Could not read that book: " + failure.getMessage());
             }
-        } catch (Exception failure) {
-            call.reject("Could not read that book: " + failure.getMessage());
-        }
+        }, "folder-picker-copy").start();
+    }
+
+    @PluginMethod
+    public void discard(PluginCall call) {
+        IncomingFiles.discard(getContext(), call.getString("path"));
+        call.resolve();
     }
 }
