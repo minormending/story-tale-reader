@@ -374,6 +374,13 @@ re-import, delete, layout overrides. Sort by recent/title/author. Import via:
 - File picker (`<input type="file" multiple accept=".epub,.pdf,.mobi,.azw3">`)
 - Drag & drop onto the window (desktop/web)
 - Android: system share sheet + "Open with Storyframe" from any file manager
+- Android: **Add a folder**, through the system folder picker; every book in it and
+  in the folders inside it, skipping any already on the shelf (same file name and size)
+- Android 11+: **Add from Downloads**. The folder picker refuses Downloads itself ("to
+  protect your privacy, choose another folder"), and Downloads is where people keep
+  their books. Reading it needs "All files access" (`MANAGE_EXTERNAL_STORAGE`), which
+  the reader turns on in Android's settings after the app says why; it is asked for
+  only when they choose Downloads, never at install, and only book files are read.
 
 One bundled public-domain sample book ships with the app, so the GitHub Pages URL
 demonstrates fixed-layout rendering to a first-time visitor instead of showing an
@@ -695,7 +702,9 @@ Checked at startup; each failure degrades one capability, never the whole app:
 - Intent filters for `application/epub+zip`, `application/pdf`, `application/x-mobipocket-ebook`, plus `.epub`/`.azw3` path-pattern matching, so Story Tale Reader appears in "Open with" from any file manager.
 - Handle `ACTION_VIEW` / `ACTION_SEND` at cold start: copy the incoming file into app storage, import, open.
 - Immersive full-screen while reading; edge-to-edge with safe-area insets honored.
-- Ship a **universal APK** (not an AAB) — this is sideloaded, not Play-distributed.
+- Ship a **universal APK** (not an AAB) — this is sideloaded, not Play-distributed. That
+  matters for "All files access" (§6.1), which Google Play restricts to certain kinds of
+  app; it would need a declaration, or the Downloads option dropped, to go on the store.
 
 ---
 
@@ -761,6 +770,8 @@ and the reader's job is to report on it rather than to vouch for it.
 
 - **DRM is out of scope and will not be circumvented.** Encrypted files are detected at import and rejected with an explanation. Story Tale Reader opens files the user already possesses in the clear.
 - The repository contains **no copyrighted books**. Bundled sample and corpus are public domain or authored by us. `.gitignore` covers `corpus/local/`.
+- "All files access", where the reader grants it for Add from Downloads, is used only
+  to list and read book files there. It adds no network use.
 - Zero telemetry, zero analytics, zero network requests after install. Worth stating in the README — it's a real selling point for a children's app.
 
 ---

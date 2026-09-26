@@ -21,6 +21,9 @@ interface FolderPickerPlugin {
   pick(): Promise<{ cancelled: boolean; books: PickedBook[] }>
   read(options: { uri: string }): Promise<{ path: string; size: number }>
   discard(options: { path: string }): Promise<void>
+  downloadsAccess(): Promise<{ needsPermission: boolean; granted: boolean }>
+  requestDownloadsAccess(): Promise<{ granted: boolean }>
+  scanDownloads(): Promise<{ books: Array<{ path: string; name: string; size: number }> }>
 }
 
 const plugin = registerPlugin<FolderPickerPlugin>('FolderPicker')
@@ -34,6 +37,8 @@ const plugin = registerPlugin<FolderPickerPlugin>('FolderPicker')
  */
 export interface BookSource {
   name: string
+  /** Bytes, where known before loading: with the name, how a book already on the shelf is recognised. */
+  size?: number
   load: () => Promise<File>
 }
 
@@ -56,9 +61,45 @@ export async function pickFolder(): Promise<BookSource[] | undefined> {
 
   return result.books.map((book) => ({
     name: book.name,
+    size: book.size,
     load: async () => {
       const { path } = await plugin.read({ uri: book.uri })
       return readNativeCopy(path, book.name, (copy) => plugin.discard({ path: copy }))
     },
+  }))
+}
+
+/* -------------------------------- Downloads -------------------------------- */
+
+/**
+ * Whether Downloads needs "All files access" here, and whether it has it.
+ *
+ * Since Android 11 the folder picker refuses Downloads itself — "to protect your
+ * privacy, choose another folder" — so on those versions it is offered separately,
+ * and read with a permission the reader grants in Android's settings. Older
+ * versions still let the picker choose it, so nothing extra is offered there.
+ */
+export async function downloadsAccess(): Promise<{ needsPermission: boolean; granted: boolean }> {
+  if (!isNative()) return { needsPermission: false, granted: false }
+  return plugin.downloadsAccess()
+}
+
+/** Takes the reader to Android's "All files access" screen; true if they turned it on. */
+export async function requestDownloadsAccess(): Promise<boolean> {
+  return (await plugin.requestDownloadsAccess()).granted
+}
+
+/**
+ * The books in Downloads and the folders inside it.
+ *
+ * Each is fetched straight from where it lies when the import reaches it. There is
+ * no copy to discard afterwards — the file is the reader's own and stays put.
+ */
+export async function listDownloads(): Promise<BookSource[]> {
+  const { books } = await plugin.scanDownloads()
+  return books.map((book) => ({
+    name: book.name,
+    size: book.size,
+    load: () => readNativeCopy(book.path, book.name, async () => undefined),
   }))
 }

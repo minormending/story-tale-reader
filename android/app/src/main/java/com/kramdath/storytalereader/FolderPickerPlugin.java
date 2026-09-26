@@ -4,7 +4,10 @@ import android.content.ContentResolver;
 import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
+import android.os.Build;
+import android.os.Environment;
 import android.provider.DocumentsContract;
+import android.provider.Settings;
 
 import androidx.activity.result.ActivityResult;
 
@@ -18,6 +21,8 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 
 import java.io.File;
 import java.util.ArrayDeque;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
@@ -34,6 +39,14 @@ import java.util.Locale;
  * per book — which is cheap whatever the folder holds. Reading copies one book into
  * the cache and returns its path (see IncomingFiles), and is called once per book as
  * the import reaches it, so a folder of forty books never has forty in flight.
+ *
+ * Downloads is the exception. Since Android 11 the folder picker refuses it outright
+ * ("to protect your privacy, choose another folder"), along with the root of storage,
+ * so no amount of asking through the picker will reach it — and Downloads is where
+ * people keep their books, and where their other reading apps look. The only way in
+ * is "All files access" (MANAGE_EXTERNAL_STORAGE), which the reader turns on in
+ * Android's settings; with it, Downloads is listed directly from the file system.
+ * It is asked for only when someone chooses Downloads, and only book files are read.
  */
 @CapacitorPlugin(name = "FolderPicker")
 public class FolderPickerPlugin extends Plugin {
@@ -170,6 +183,117 @@ public class FolderPickerPlugin extends Plugin {
                 call.reject("Could not read that book: " + failure.getMessage());
             }
         }, "folder-picker-copy").start();
+    }
+
+    /* ------------------------------ Downloads ------------------------------ */
+
+    /**
+     * Whether Downloads needs a permission on this device, and whether it has it.
+     * Below Android 11 the folder picker still offers Downloads, so nothing is needed.
+     */
+    @PluginMethod
+    public void downloadsAccess(PluginCall call) {
+        JSObject out = new JSObject();
+        out.put("needsPermission", Build.VERSION.SDK_INT >= Build.VERSION_CODES.R);
+        out.put("granted", hasDownloadsAccess());
+        call.resolve(out);
+    }
+
+    /** Opens Android's "All files access" screen for this app, and answers once the reader is back. */
+    @PluginMethod
+    public void requestDownloadsAccess(PluginCall call) {
+        if (hasDownloadsAccess() || Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            JSObject out = new JSObject();
+            out.put("granted", hasDownloadsAccess());
+            call.resolve(out);
+            return;
+        }
+        Intent intent = new Intent(
+            Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+            Uri.parse("package:" + getContext().getPackageName())
+        );
+        // Some builds of Android only offer the list of every app, not this app's page.
+        if (intent.resolveActivity(getContext().getPackageManager()) == null) {
+            intent = new Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION);
+        }
+        startActivityForResult(call, intent, "downloadsAccessAnswered");
+    }
+
+    @ActivityCallback
+    private void downloadsAccessAnswered(PluginCall call, ActivityResult result) {
+        if (call == null) return;
+        // The settings screen reports nothing useful as its result: ask the system.
+        JSObject out = new JSObject();
+        out.put("granted", hasDownloadsAccess());
+        call.resolve(out);
+    }
+
+    private boolean hasDownloadsAccess() {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && Environment.isExternalStorageManager();
+    }
+
+    /**
+     * Every book in Downloads and the folders inside it, breadth-first and within the
+     * same limits as a picked folder. Returned as file paths, which the web layer
+     * fetches straight from disk through Capacitor's local server: no copy, and
+     * nothing to discard afterwards, because the file is the reader's own.
+     */
+    @PluginMethod
+    public void scanDownloads(PluginCall call) {
+        if (!hasDownloadsAccess()) {
+            call.reject("Story Tale does not have access to Downloads", "NO_ACCESS");
+            return;
+        }
+        new Thread(() -> {
+            try {
+                File root = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+                JSArray books = new JSArray();
+                for (File file : scan(root)) {
+                    JSObject book = new JSObject();
+                    book.put("path", file.getAbsolutePath());
+                    book.put("name", file.getName());
+                    book.put("size", file.length());
+                    books.put(book);
+                }
+                JSObject out = new JSObject();
+                out.put("books", books);
+                call.resolve(out);
+            } catch (Exception failure) {
+                call.reject("Could not read Downloads: " + failure.getMessage());
+            }
+        }, "downloads-scan").start();
+    }
+
+    private List<File> scan(File root) {
+        List<File> books = new ArrayList<>();
+        Deque<File> folders = new ArrayDeque<>();
+        Deque<Integer> depths = new ArrayDeque<>();
+        folders.add(root);
+        depths.add(0);
+
+        while (!folders.isEmpty() && books.size() < MAX_FILES) {
+            File folder = folders.removeFirst();
+            int depth = depths.removeFirst();
+            File[] children = folder.listFiles();
+            if (children == null) continue;
+            // Listings come back in no particular order; a stable one keeps the
+            // import's "Adding 3 of 12" meaning the same thing twice running.
+            Arrays.sort(children, Comparator.comparing(File::getName, String.CASE_INSENSITIVE_ORDER));
+            for (File child : children) {
+                if (books.size() >= MAX_FILES) break;
+                // .thumbnails, .trashed-…, and whatever else an app hides in there.
+                if (child.getName().startsWith(".")) continue;
+                if (child.isDirectory()) {
+                    if (depth + 1 <= MAX_DEPTH) {
+                        folders.add(child);
+                        depths.add(depth + 1);
+                    }
+                } else if (child.isFile() && looksLikeABook(child.getName())) {
+                    books.add(child);
+                }
+            }
+        }
+        return books;
     }
 
     @PluginMethod
