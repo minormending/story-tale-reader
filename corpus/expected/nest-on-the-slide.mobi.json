@@ -1,0 +1,78 @@
+{
+  "contract": 1,
+  "file": "nest-on-the-slide.mobi",
+  "format": "mobi",
+  "book": {
+    "format": "mobi",
+    "metadata": {
+      "title": "A Nest on the Slide",
+      "creator": "Story Tale Reader fixtures",
+      "language": "en",
+      "identifier": "mobi:A Nest on the Slide",
+      "accessibility": {
+        "features": [],
+        "hazards": [],
+        "accessModes": []
+      }
+    },
+    "layout": "reflowable",
+    "layoutInferred": false,
+    "spread": "auto",
+    "spreadSource": "index-parity",
+    "direction": "ltr",
+    "pages": [
+      {
+        "index": 0,
+        "id": "s0",
+        "path": "OEBPS/part0001.html",
+        "viewport": {
+          "width": 1200,
+          "height": 1600
+        },
+        "spreadSide": "center",
+        "linear": true
+      }
+    ],
+    "nav": [
+      {
+        "label": "Section 1",
+        "href": "part0001.html",
+        "path": "OEBPS/part0001.html",
+        "fragment": "",
+        "children": []
+      }
+    ],
+    "coverPath": "OEBPS/images/img00001.jpg",
+    "hasMediaOverlays": false,
+    "packagePath": "OEBPS/package.opf",
+    "altText": {
+      "images": 1,
+      "described": 0,
+      "decorative": 1,
+      "pagesChecked": 1,
+      "pageCount": 1
+    }
+  },
+  "spreads": {
+    "paired": [
+      {
+        "center": 0
+      }
+    ],
+    "single": [
+      {
+        "center": 0
+      }
+    ]
+  },
+  "shifted": {
+    "sides": [
+      "center"
+    ],
+    "paired": [
+      {
+        "center": 0
+      }
+    ]
+  }
+}

@@ -17,6 +17,21 @@ is more to read, and stop when there is not, and those are different endings.
 Regenerating rewrites every fixture, because the zip records a modification time.
 Only commit the ones whose *contents* changed.
 
+## `expected/`
+
+What this engine makes of each fixture, as JSON: the parsed book, its spreads in
+both orientations and with the reader's shift, the shelf's unmeasured view of it,
+and every media-overlay timeline. The Android app's Kotlin engine is tested
+against these files rather than sharing code with this one
+(`src/engine/contract.ts`).
+
+`npm test` fails when they no longer match the engine. After a deliberate change,
+`npm run contract` rewrites them; commit the diff with the change that caused it,
+so the port can see exactly what moved.
+
+`CONTRACT_BOOKS=<folder> npm run contract` writes the same for books that cannot
+be committed, into `<folder>/.expected/`.
+
 ## `local/`
 
 **Gitignored.** Real, in-copyright books used during development. The reference
