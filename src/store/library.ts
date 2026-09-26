@@ -25,6 +25,7 @@ import {
   put,
   remove,
 } from './idb'
+import { latestOnly } from './latest'
 import { deleteBookFile, loadBookFile, requestPersistence, saveBookFile } from './files'
 import { removeBookmarksFor } from './bookmarks'
 
@@ -264,13 +265,22 @@ export async function getProgress(
   }
 }
 
+/**
+ * Coalesced: a position is saved when it changes, one write per book at a time,
+ * keeping only the newest while one is in flight (see ./latest).
+ */
+const writeProgress = latestOnly<Progress>(
+  (_id, progress) => put(STORE_PROGRESS, progress),
+  (a, b) => a.pageIndex === b.pageIndex && a.screen === b.screen && a.anchor === b.anchor,
+)
+
 export async function saveProgress(
   id: string,
   pageIndex: number,
   screen = 0,
   anchor?: number,
 ): Promise<void> {
-  await put(STORE_PROGRESS, { id, pageIndex, screen, anchor, updatedAt: Date.now() } satisfies Progress)
+  await writeProgress(id, { id, pageIndex, screen, anchor, updatedAt: Date.now() } satisfies Progress)
 }
 
 /* -------------------------------- overrides -------------------------------- */
