@@ -42,6 +42,23 @@ export function ReflowableStage({
   const frameRef = useRef<HTMLIFrameElement>(null)
   const [inlineHtml, setInlineHtml] = useState<string | null>(null)
 
+  /*
+   * The parent's callbacks, read through refs so that a new function identity on
+   * each of its renders does not re-run the layout below.
+   *
+   * It used to: the viewer's document callback changed identity every render, each
+   * new identity re-ran layout, and layout called that callback, which re-rendered
+   * the viewer — a loop that re-styled and re-measured the whole chapter on every
+   * frame and saved the reading position each time. On a cheap tablet that was three
+   * CPU cores busy while nobody touched the book, and fifty storage writes a second.
+   */
+  const measured = useRef(onMeasured)
+  measured.current = onMeasured
+  const documentReady = useRef(onDocumentReady)
+  documentReady.current = onDocumentReady
+  /** The document last handed to the parent: a new one is reported once, not on every layout. */
+  const reported = useRef<Document | null>(null)
+
   useEffect(() => {
     if (!resolveInline) return
     let cancelled = false
@@ -67,12 +84,17 @@ export function ReflowableStage({
       ;(doc.head ?? doc.documentElement).appendChild(style)
     }
     style.textContent = reflowableStyles(frame, typography)
-    onDocumentReady?.(doc)
+    if (reported.current !== doc) {
+      reported.current = doc
+      documentReady.current?.(doc)
+    }
 
     // Force layout before measuring, otherwise the column count lags a setting change.
     void body.offsetWidth
-    onMeasured(screenCount(body, frame.width))
-  }, [frame, typography, onMeasured, onDocumentReady])
+    measured.current(screenCount(body, frame.width))
+    // `frame` is a new object whenever the frame is measured; its numbers are what matter.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [frame.width, frame.height, typography, language])
 
   useEffect(() => {
     layout()
