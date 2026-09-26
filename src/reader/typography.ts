@@ -82,6 +82,11 @@ export function reflowableStyles(
       height: ${frame.height}px !important;
       width: ${frame.width}px !important;
       -webkit-text-size-adjust: none;
+      /* The reader owns every gesture over the page. Left to itself the browser
+         claims a horizontal swipe as a pan of this wide, multi-column body and
+         cancels the pointer, so swipes never turned the page — only taps did. */
+      touch-action: none;
+      -webkit-tap-highlight-color: transparent;
       ${palette ? `background: ${palette.bg} !important;` : ''}
     }
     body {
@@ -115,6 +120,8 @@ export function reflowableStyles(
            }`
         : ''
     }
+    /* An image drag would start native drag-and-drop and swallow the swipe. */
+    img, svg { -webkit-user-drag: none; user-select: none; }
     /* Keep figures inside one column instead of forcing a blank page. */
     img, svg, video {
       max-width: 100% !important;
