@@ -147,8 +147,16 @@ export function Viewer({
     [spreads, spreadIndex, book.direction],
   )
 
-  // In a right-to-left book the "next" page is to the left.
-  const forward = book.direction === 'rtl' ? -1 : 1
+  /*
+   * The step taken by going right: a right arrow, a tap on the right edge, a swipe
+   * towards the left. In a right-to-left book that is backwards through the story,
+   * because its next page is to the left.
+   *
+   * Only physical input uses this. "Next", "Previous" and read-along's automatic
+   * turn mean the story's order, which is +1 whatever the direction. They used this
+   * too, once, which sent an RTL book's Next button and narration backwards.
+   */
+  const rightStep = book.direction === 'rtl' ? -1 : 1
 
   const readAlongSettings = useMemo<ReadAlongSettings>(
     () => ({
@@ -165,7 +173,7 @@ export function Viewer({
     spread,
     direction: book.direction,
     settings: readAlongSettings,
-    onFinishedSpread: () => turn(forward),
+    onFinishedSpread: () => turn(1),
     // "Read together" ends each page with a grown-up about to turn it. The bars
     // hide themselves after three seconds, so without this the control they need
     // is behind a tap on an empty-looking page.
@@ -202,7 +210,7 @@ export function Viewer({
   // Declared after read-along so a tap on a narrated word can be handed to it
   // rather than turning the page.
   const gestures = usePageGestures({
-    onTurn: (direction) => turn(direction * forward),
+    onTurn: (direction) => turn(direction * rightStep),
     onToggleChrome: () => setChromeVisible((visible) => !visible),
     claimTap: readAlong.claimsTap,
     bounds: { frame, content: rendered },
@@ -219,8 +227,11 @@ export function Viewer({
 
   const onKey = useCallback(
     (event: KeyboardEvent): void => {
-      if (event.key === 'ArrowRight' || event.key === 'PageDown' || event.key === ' ') turn(forward)
-      else if (event.key === 'ArrowLeft' || event.key === 'PageUp') turn(-forward)
+      // Arrows go the way they point on the page; PageDown and Space mean "next".
+      if (event.key === 'ArrowRight') turn(rightStep)
+      else if (event.key === 'ArrowLeft') turn(-rightStep)
+      else if (event.key === 'PageDown' || event.key === ' ') turn(1)
+      else if (event.key === 'PageUp') turn(-1)
       else if (event.key === 'Escape') {
         // Back out one level at a time rather than leaving the book from the menu.
         if (menuOpen) setMenuOpen(false)
@@ -228,7 +239,7 @@ export function Viewer({
         else if (!locked) onClose()
       }
     },
-    [turn, forward, onClose, menuOpen, locked],
+    [turn, rightStep, onClose, menuOpen, locked],
   )
 
   useEffect(() => {
@@ -547,7 +558,7 @@ export function Viewer({
       )}
 
       <footer className={`chrome chrome-bottom${chromeVisible ? '' : ' hidden'}`}>
-        <button className="icon-button" onClick={() => turn(-forward)} disabled={spreadIndex === 0}>
+        <button className="icon-button" onClick={() => turn(-1)} disabled={spreadIndex === 0}>
           Previous
         </button>
         <div className="chrome-centre">
@@ -585,7 +596,7 @@ export function Viewer({
         </div>
         <button
           className="icon-button"
-          onClick={() => turn(forward)}
+          onClick={() => turn(1)}
           disabled={spreadIndex >= spreads.length - 1}
         >
           Next
