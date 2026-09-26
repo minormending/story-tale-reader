@@ -229,14 +229,19 @@ export function ReflowableViewer({
     onToggleChrome: () => setChromeVisible((visible) => !visible),
   })
 
+  // `gestures` is a new object every render; its attachToPage is stable. Depending
+  // on the object made this callback new on every render too, which fed a render loop
+  // through the stage (see ReflowableStage).
+  const { attachToPage } = gestures
   const onPageDocument = useCallback(
     (doc: Document) => {
+      attachPageKeys(doc)
+      attachToPage(doc)
+      if (docRef.current === doc) return
       docRef.current = doc
       setDocGeneration((generation) => generation + 1)
-      attachPageKeys(doc)
-      gestures.attachToPage(doc)
     },
-    [attachPageKeys, gestures],
+    [attachPageKeys, attachToPage],
   )
 
   // Drop the previous section's document the moment the section changes, so the
