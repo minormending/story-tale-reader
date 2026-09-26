@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { groupIntoSeries, type SeriesCandidate } from './series'
+import { authorKey, groupIntoSeries, type SeriesCandidate } from './series'
 
 /**
  * Grouping a shelf into series.
@@ -129,5 +129,142 @@ describe('groupIntoSeries', () => {
     ])
     expect(names(groups)).toEqual(['Learn to Read'])
     expect(groups[0]?.source).toBe('declared')
+  })
+
+  /*
+   * The cases below come from the test tablet's shelf, where each one split a series
+   * or left a book out of it.
+   */
+
+  it('gathers undeclared books into a declared series their titles name', () => {
+    const groups = groupIntoSeries([
+      book("Bluey: Bluey's Big World", 'Bluey', { series: 'Bluey', seriesIndex: 0 }),
+      book('Bluey: The Decider', 'Bluey', { series: 'Bluey', seriesIndex: 1 }),
+      book('Bluey: Grandad', 'Bluey'),
+      book('Bluey: Granny Mobile', 'Bluey'),
+    ])
+    expect(names(groups)).toEqual(['Bluey'])
+    // Numbered books first, in their order; the rest after, alphabetically.
+    expect(titles(groups, 'Bluey')).toEqual([
+      "Bluey: Bluey's Big World", 'Bluey: The Decider', 'Bluey: Grandad', 'Bluey: Granny Mobile',
+    ])
+    expect(groups[0]?.source).toBe('inferred')
+  })
+
+  it('files a book under a series that is credited as its author', () => {
+    // Licensed books often credit the brand: "Trains", by Bluey.
+    const groups = groupIntoSeries([
+      book('Bluey: The Decider', 'Bluey', { series: 'Bluey' }),
+      book('Bluey: Verandah Santa', 'Bluey', { series: 'Bluey' }),
+      book('Trains', 'Bluey'),
+    ])
+    expect(titles(groups, 'Bluey')).toContain('Trains')
+  })
+
+  it('groups a name before a colon when the author is the same', () => {
+    const groups = groupIntoSeries([book('Bluey: Grandad', 'Bluey'), book('Bluey: Granny Mobile', 'Bluey')])
+    expect(names(groups)).toEqual(['Bluey'])
+  })
+
+  it('does not group a name before a colon across different authors', () => {
+    expect(groupIntoSeries([book('Frozen: A Sister More', 'One'), book('Frozen: The Ice Palace', 'Two')])).toEqual([])
+  })
+
+  it('merges a declared series with the title group it is plainly part of', () => {
+    const groups = groupIntoSeries([
+      book('Amelia Bedelia Is for the Birds', 'Herman Parish'),
+      book('Amelia Bedelia Scared Silly', 'Herman Parish'),
+      book('Amelia Bedelia Tries Her Luck', 'Peggy Parish', { series: 'Amelia Bedelia I Can Read Level 1', seriesIndex: 4 }),
+    ])
+    expect(names(groups)).toEqual(['Amelia Bedelia'])
+    expect(titles(groups, 'Amelia Bedelia')).toHaveLength(3)
+  })
+
+  it('does not merge series whose shared name is one real word', () => {
+    // "The Tale" is where Beatrix Potter's titles meet, not a series anyone else is in.
+    const groups = groupIntoSeries([
+      book('The Tale of Peter Rabbit', 'Beatrix Potter'),
+      book('The Tale of Benjamin Bunny', 'Beatrix Potter'),
+      book('The Tale of Despereaux', 'Kate DiCamillo', { series: 'The Tale of Despereaux' }),
+      book('Despereaux Returns', 'Kate DiCamillo', { series: 'The Tale of Despereaux' }),
+    ])
+    expect(names(groups)).toEqual(['The Tale', 'The Tale of Despereaux'])
+    expect(titles(groups, 'The Tale')).toHaveLength(2)
+  })
+
+  it('agrees an author written two ways, and reads numbers wherever the title puts them', () => {
+    const groups = groupIntoSeries([
+      book('Dragon Masters #6: Flight of the Moon Dragon', 'Tracey West'),
+      book('Dragon Masters #2: Saving the Sun Dragon', 'West, Tracey'),
+      book('Power of the Fire Dragon: A Branches Book (Dragon Masters #4)', 'Tracey West'),
+    ])
+    expect(names(groups)).toEqual(['Dragon Masters'])
+    expect(titles(groups, 'Dragon Masters')).toEqual([
+      'Dragon Masters #2: Saving the Sun Dragon',
+      'Power of the Fire Dragon: A Branches Book (Dragon Masters #4)',
+      'Dragon Masters #6: Flight of the Moon Dragon',
+    ])
+  })
+
+  it('ignores roles after an author, and names the series as a title spells it', () => {
+    const groups = groupIntoSeries([
+      book('Never let a unicorn get spots!', 'Alber, Diane, author, illustrator'),
+      book('Never Let a Unicorn Scribble!', 'Diane Alber'),
+    ])
+    expect(names(groups)).toEqual(['Never Let a Unicorn'])
+  })
+
+  it('lets a book with no author join a series its title opens with', () => {
+    // A PDF without metadata: no author, and the file name for a title.
+    const groups = groupIntoSeries([
+      book('Fancy Nancy and the Mermaid Ballet', "Jane O'Connor"),
+      book('Fancy Nancy and the Too-Loose Tooth', 'Jane O\u2019Connor'),
+      book("Fancy Nancy Sees Stars -- O'Connor, Jane -- I Can Read 1"),
+    ])
+    expect(titles(groups, 'Fancy Nancy')).toHaveLength(3)
+  })
+
+  it('lets the first book, titled just the series name, join its sequels', () => {
+    const groups = groupIntoSeries([
+      book('Fancy Nancy', "Jane O'Connor"),
+      book('Fancy Nancy: Best Reading Buddies', "Jane O'Connor"),
+      book('Fancy Nancy: Spring Fashion Fling', "Jane O'Connor"),
+    ])
+    expect(titles(groups, 'Fancy Nancy')).toHaveLength(3)
+  })
+
+  it('does not let a different author join a series by title alone', () => {
+    const groups = groupIntoSeries([
+      book('Fancy Nancy and the Mermaid Ballet', "Jane O'Connor"),
+      book('Fancy Nancy and the Too-Loose Tooth', "Jane O'Connor"),
+      book('Fancy Nancy Knockoff', 'Someone Else'),
+    ])
+    expect(titles(groups, 'Fancy Nancy')).not.toContain('Fancy Nancy Knockoff')
+  })
+
+  it('does not show a declared series of one as a group', () => {
+    expect(groupIntoSeries([book('Elmo Says Achoo!', 'Sarah Albee', { series: 'Step into Reading' })])).toEqual([])
+  })
+})
+
+describe('authorKey', () => {
+  it('agrees the ways one name is written', () => {
+    const key = authorKey('Tracey West')
+    expect(authorKey('West, Tracey')).toBe(key)
+    expect(authorKey("O'Connor, Jane")).toBe(authorKey('Jane O\u2019Connor'))
+    expect(authorKey('jane oconnor')).toBe(authorKey("Jane O'Connor"))
+    expect(authorKey('Alber, Diane, author, illustrator')).toBe(authorKey('Diane Alber'))
+  })
+
+  it('takes the first of several authors', () => {
+    expect(authorKey('Herman Parish; Lynne Avril')).toBe(authorKey('Herman Parish'))
+    expect(authorKey('Peggy Parish & Herman Parish')).toBe(authorKey('Peggy Parish'))
+    expect(authorKey("Jane O'Connor, Robin Preiss Glasser")).toBe(authorKey("Jane O'Connor"))
+  })
+
+  it('tells different people apart', () => {
+    expect(authorKey('Herman Parish')).not.toBe(authorKey('Peggy Parish'))
+    expect(authorKey(undefined)).toBeUndefined()
+    expect(authorKey(' , ')).toBeUndefined()
   })
 })
