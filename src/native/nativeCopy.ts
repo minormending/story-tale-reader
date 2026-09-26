@@ -1,5 +1,6 @@
 /**
- * Reading a book that native code has copied into the app's cache.
+ * Reading a book that native code has copied into the app's cache — or, for a book
+ * in Downloads, the reader's own file where it lies, with nothing to discard after.
  *
  * Books from outside the web layer ("Open with", the share sheet, a picked folder)
  * are streamed to a file by the Android side and fetched here through Capacitor's

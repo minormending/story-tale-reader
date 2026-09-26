@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Library } from './Library'
 import { LoadingBook, type BookLoading } from './LoadingBook'
-import { canPickFolderNatively, pickFolder, type BookSource } from '../native/folderPicker'
+import {
+  canPickFolderNatively, downloadsAccess, listDownloads, pickFolder, requestDownloadsAccess, type BookSource,
+} from '../native/folderPicker'
 import { Viewer } from './Viewer'
 import { ReflowableViewer } from './ReflowableViewer'
 import { DrmError } from '../engine/epub/ocf'
@@ -35,6 +37,8 @@ export function App() {
   const [loading, setLoading] = useState<BookLoading | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  // Android 11 and later, where the folder picker will not open Downloads itself.
+  const [downloadsOffered, setDownloadsOffered] = useState(false)
 
   /*
    * How this household reads, loaded once and owned above both viewers.
@@ -143,7 +147,7 @@ export function App() {
    * encrypted, and refusing the whole import over one file would be useless.
    */
   const importMany = useCallback(
-    async (sources: BookSource[]) => {
+    async (sources: BookSource[], alreadyShelved = 0) => {
       setError(null)
       setNotice(null)
       const failures: string[] = []
@@ -176,13 +180,14 @@ export function App() {
       setEntries(await listLibrary())
 
       const added = sources.length - failures.length
+      const skipped = alreadyShelved > 0 ? ` ${alreadyShelved} ${alreadyShelved === 1 ? 'was' : 'were'} already on the shelf.` : ''
       if (failures.length === 0) {
-        setNotice(`Added ${added} ${added === 1 ? 'book' : 'books'}.`)
+        setNotice(`Added ${added} ${added === 1 ? 'book' : 'books'}.${skipped}`)
       } else {
         // Named, not counted: "3 books could not be added" leaves the reader to work
         // out which, from a shelf they have not seen before.
         setNotice(
-          `Added ${added} of ${sources.length}. These could not be opened — ` +
+          `Added ${added} of ${sources.length}.${skipped} These could not be opened — ` +
             failures.join('; '),
         )
       }
@@ -190,21 +195,83 @@ export function App() {
     [],
   )
 
+  /**
+   * Import what a folder holds, leaving alone the books already on the shelf.
+   *
+   * A folder is something people add again after putting new books in it — Downloads
+   * especially — and re-importing forty books to pick up one new one would take
+   * minutes on a cheap tablet. A book counts as already there when an entry has its
+   * file name and size; the rare false match costs a re-add, not a lost book.
+   */
+  const importNew = useCallback(
+    async (sources: BookSource[], where: string) => {
+      if (sources.length === 0) {
+        setNotice(`No books in ${where}.`)
+        return
+      }
+      const shelved = new Set((await listLibrary()).map((entry) => `${entry.fileName}\u0000${entry.size}`))
+      const fresh = sources.filter((source) => source.size === undefined || !shelved.has(`${source.name}\u0000${source.size}`))
+      if (fresh.length === 0) {
+        setNotice(`Every book in ${where} is already on the shelf.`)
+        return
+      }
+      await importMany(fresh, sources.length - fresh.length)
+    },
+    [importMany],
+  )
+
   /** Android only: choose a real folder, then import what is in it. */
   const importFolder = useCallback(async () => {
     setError(null)
+    setNotice(null)
     const sources = await pickFolder().catch((cause) => {
       setError(cause instanceof Error ? cause.message : String(cause))
       return undefined
     })
     // Backed out of the picker, or the platform has no picker to back out of.
     if (!sources) return
-    if (sources.length === 0) {
-      setNotice('No books in that folder.')
-      return
+    await importNew(sources, 'that folder')
+  }, [importNew])
+
+  useEffect(() => {
+    if (!canPickFolderNatively()) return
+    void downloadsAccess()
+      .then((access) => setDownloadsOffered(access.needsPermission))
+      .catch(() => setDownloadsOffered(false))
+  }, [])
+
+  /**
+   * Android 11 and later: add every book in Downloads.
+   *
+   * The folder picker refuses Downloads there, and the only other way in is "All
+   * files access", which the reader switches on in Android's settings. Asked for
+   * here, when Downloads is what they chose, with the reason in front of them —
+   * never at install, and never for anything else.
+   */
+  const importDownloads = useCallback(async () => {
+    setError(null)
+    setNotice(null)
+    try {
+      if (!(await downloadsAccess()).granted) {
+        const go = window.confirm(
+          'Android only lets an app read Downloads if you turn on \u201cAll files access\u201d for it. ' +
+            'Story Tale uses it to find and read the books in Downloads, and nothing else \u2014 ' +
+            'it has no network features, so nothing leaves this device.\n\nOpen that setting now?',
+        )
+        if (!go) return
+        if (!(await requestDownloadsAccess())) {
+          setNotice(
+            'Downloads stays closed until \u201cAll files access\u201d is on for Story Tale. ' +
+              'Or keep your books in a folder inside Downloads, and choose that with Add a folder.',
+          )
+          return
+        }
+      }
+      await importNew(await listDownloads(), 'Downloads')
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause))
     }
-    await importMany(sources)
-  }, [importMany])
+  }, [importNew])
 
   const openEntry = useCallback(
     async (id: string) => {
@@ -318,6 +385,7 @@ export function App() {
       onOpenFile={(file) => void openFile(file)}
       onImportMany={(sources) => void importMany(sources)}
       onPickFolder={canPickFolderNatively() ? () => void importFolder() : undefined}
+      onAddFromDownloads={downloadsOffered ? () => void importDownloads() : undefined}
       onOpenEntry={(id) => void openEntry(id)}
       onDelete={(id) => void remove(id)}
       busy={busy}

@@ -26,6 +26,7 @@ export function Library({
   onDelete,
   onImportMany,
   onPickFolder,
+  onAddFromDownloads,
   busy,
   error,
   notice,
@@ -37,6 +38,8 @@ export function Library({
   onImportMany: (sources: BookSource[]) => void
   /** Android only: a real folder chooser, which the browser cannot offer. */
   onPickFolder?: () => void
+  /** Android 11 and later, where the folder picker refuses Downloads itself. */
+  onAddFromDownloads?: () => void
   busy: string | null
   error: string | null
   notice: string | null
@@ -157,6 +160,16 @@ export function Library({
             <span aria-hidden="true">🗂</span>{' '}
             {onPickFolder || foldersWork ? 'Add a folder' : 'Add several'}
           </button>
+          {onAddFromDownloads && (
+            <button
+              className="secondary"
+              onClick={onAddFromDownloads}
+              disabled={!!busy}
+              title="Add every book in Downloads, including the folders inside it"
+            >
+              <span aria-hidden="true">📥</span> Add from Downloads
+            </button>
+          )}
         </div>
         <input
           ref={inputRef}
