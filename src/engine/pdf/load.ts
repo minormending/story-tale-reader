@@ -15,6 +15,17 @@ import type { BookPage, LayoutOverrides, ParsedBook } from '../types'
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl
 
+/**
+ * Where pdf.js finds the files it loads by name (scripts/pdfjs-assets.ts).
+ *
+ * Without them it cannot decode JPEG 2000 or JBIG2 images, which is how scanned
+ * books store their pages, and draws those pages blank white. Absolute, because
+ * the worker resolves them, not the page.
+ */
+function assetFolder(folder: string): string {
+  return new URL(`${import.meta.env.BASE_URL}pdfjs/${folder}/`, globalThis.location?.href ?? 'http://localhost/').href
+}
+
 export interface LoadedPdf {
   book: ParsedBook
   document: PDFDocumentProxy
@@ -34,7 +45,12 @@ export async function loadPdf(
 ): Promise<LoadedPdf> {
   let document: PDFDocumentProxy
   try {
-    document = await pdfjs.getDocument({ data }).promise
+    document = await pdfjs.getDocument({
+      data,
+      wasmUrl: assetFolder('wasm'),
+      standardFontDataUrl: assetFolder('standard_fonts'),
+      iccUrl: assetFolder('iccs'),
+    }).promise
   } catch (cause) {
     const message = cause instanceof Error ? cause.message : String(cause)
     if (/password/i.test(message)) {
@@ -121,11 +137,17 @@ async function outline(document: PDFDocumentProxy): Promise<ParsedBook['nav']> {
   }
 }
 
-/** Render one page into a canvas at the given CSS scale, sharp on high-DPI screens. */
+/**
+ * Render one page into a canvas at the given CSS scale, sharp on high-DPI screens.
+ *
+ * Also used off-screen, for a PDF's cover. An OffscreenCanvas has no `style` — it
+ * is never laid out — and setting one threw, which the cover code swallowed, so no
+ * PDF on any shelf had ever had a cover.
+ */
 export async function renderPdfPage(
   document: PDFDocumentProxy,
   pageNumber: number,
-  canvas: HTMLCanvasElement,
+  canvas: HTMLCanvasElement | OffscreenCanvas,
   cssScale: number,
   devicePixelRatio: number,
 ): Promise<void> {
@@ -134,10 +156,13 @@ export async function renderPdfPage(
 
   canvas.width = Math.round(viewport.width)
   canvas.height = Math.round(viewport.height)
-  canvas.style.width = `${Math.round(viewport.width / devicePixelRatio)}px`
-  canvas.style.height = `${Math.round(viewport.height / devicePixelRatio)}px`
+  if (typeof HTMLCanvasElement !== 'undefined' && canvas instanceof HTMLCanvasElement) {
+    canvas.style.width = `${Math.round(viewport.width / devicePixelRatio)}px`
+    canvas.style.height = `${Math.round(viewport.height / devicePixelRatio)}px`
+  }
 
-  const context = canvas.getContext('2d')
+  const context = canvas.getContext('2d') as CanvasRenderingContext2D | null
   if (!context) throw new PdfError('This device could not provide a drawing surface')
-  await page.render({ canvas, canvasContext: context, viewport }).promise
+  // pdf.js types its canvas as a DOM one; it only ever draws through the context.
+  await page.render({ canvas: canvas as HTMLCanvasElement, canvasContext: context, viewport }).promise
 }

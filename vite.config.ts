@@ -3,6 +3,7 @@ import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import { devCorpus } from './scripts/dev-corpus'
+import { pdfjsAssets } from './scripts/pdfjs-assets'
 
 /**
  * Which build this is, as a number someone can read out.
@@ -52,6 +53,7 @@ export default defineConfig({
   plugins: [
     react(),
     devCorpus(),
+    pdfjsAssets(),
     VitePWA({
       strategies: 'injectManifest',
       srcDir: 'src',
@@ -60,7 +62,9 @@ export default defineConfig({
       // it to take control before any book iframe is created.
       injectRegister: false,
       injectManifest: {
-        globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
+        // pdf.js's decoders and fonts too (scripts/pdfjs-assets.ts): a scanned PDF
+        // opened offline would otherwise draw its pages blank.
+        globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}', 'pdfjs/**/*.{wasm,pfb,ttf,icc}'],
         maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
         // Bundle to a classic worker: module service workers are still not
         // universally supported, and the registration in vfs/client.ts is classic.

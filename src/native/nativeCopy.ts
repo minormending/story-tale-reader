@@ -17,7 +17,10 @@ export async function readNativeCopy(
   discard: (path: string) => Promise<unknown>,
 ): Promise<File> {
   try {
-    const response = await fetch(Capacitor.convertFileSrc(path))
+    // Each segment escaped: a file name with "#" in it — "Dragon Masters #5" — was
+    // otherwise cut off at the "#" as a URL fragment, and the server found nothing.
+    // Capacitor's server decodes the path again before opening the file.
+    const response = await fetch(Capacitor.convertFileSrc(path.split('/').map(encodeURIComponent).join('/')))
     if (!response.ok) throw new Error(`Could not read that book (HTTP ${response.status})`)
     return new File([await response.blob()], name)
   } finally {

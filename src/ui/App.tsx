@@ -10,7 +10,7 @@ import { DrmError } from '../engine/epub/ocf'
 import { mountBook, setReading, startVfs, unmountBook } from '../vfs/client'
 import { onBookOpened, takeIncomingBook } from '../native/bookIntent'
 import {
-  deleteBook, getOverrides, getProgress, importBook, listLibrary, openStoredBook,
+  deleteBook, getOverrides, getProgress, importBook, listLibrary, openStoredBook, repairCovers,
   saveOverrides, saveProgress, type LibraryEntry, type OpenedBook,
 } from '../store/library'
 import type { ZipArchive } from '../engine/zip/reader'
@@ -84,6 +84,21 @@ export function App() {
   useEffect(() => {
     setReading(session !== null)
   }, [session])
+
+  // Covers an older build could not make, made now while the shelf is showing. It
+  // stops between books as soon as one is opened or an import starts, and what it
+  // finished is kept, so the next time the shelf shows it carries on from there.
+  useEffect(() => {
+    if (session !== null || busy !== null) return
+    let stopped = false
+    void repairCovers(
+      (entry) => setEntries((list) => list.map((item) => (item.id === entry.id ? entry : item))),
+      () => stopped,
+    ).catch(() => undefined)
+    return () => {
+      stopped = true
+    }
+  }, [session, busy])
 
   const enter = useCallback(async (opened: OpenedBook) => {
     const { entry, book, archive } = opened
@@ -167,9 +182,12 @@ export function App() {
           // Nothing here is about to be rendered, so the pages need not be measured:
           // the entry only wants a title, an author, a count and a cover. Whichever
           // of these the reader opens first will measure it then, and keep it.
-          await importBook(file, (progress) => setLoading((at) => at && { ...at, progress }), {
+          const imported = await importBook(file, (progress) => setLoading((at) => at && { ...at, progress }), {
             measure: false,
           })
+          // Nobody is about to read it, and pdf.js holds every document it has opened
+          // until told otherwise: forty PDFs in a row was forty in memory.
+          await imported.pdf?.loadingTask.destroy()
         } catch (cause) {
           failures.push(`${source.name}: ${cause instanceof Error ? cause.message : String(cause)}`)
         }
