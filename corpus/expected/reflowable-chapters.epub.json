@@ -1,0 +1,194 @@
+{
+  "contract": 1,
+  "file": "reflowable-chapters.epub",
+  "format": "epub",
+  "book": {
+    "format": "epub",
+    "metadata": {
+      "title": "Reflowable Chapters",
+      "creator": "Story Tale Reader fixtures",
+      "language": "en",
+      "identifier": "urn:uuid:reflowable-chapters",
+      "accessibility": {
+        "features": [],
+        "hazards": [],
+        "accessModes": []
+      }
+    },
+    "layout": "reflowable",
+    "layoutInferred": false,
+    "spread": "auto",
+    "spreadSource": "index-parity",
+    "direction": "ltr",
+    "pages": [
+      {
+        "index": 0,
+        "id": "ch1",
+        "path": "OEBPS/ch1.xhtml",
+        "viewport": {
+          "width": 1200,
+          "height": 1600
+        },
+        "spreadSide": "center",
+        "linear": true
+      },
+      {
+        "index": 1,
+        "id": "ch2",
+        "path": "OEBPS/ch2.xhtml",
+        "viewport": {
+          "width": 1200,
+          "height": 1600
+        },
+        "spreadSide": "left",
+        "linear": true
+      },
+      {
+        "index": 2,
+        "id": "ch3",
+        "path": "OEBPS/ch3.xhtml",
+        "viewport": {
+          "width": 1200,
+          "height": 1600
+        },
+        "spreadSide": "right",
+        "linear": true
+      },
+      {
+        "index": 3,
+        "id": "ch4",
+        "path": "OEBPS/ch4.xhtml",
+        "viewport": {
+          "width": 1200,
+          "height": 1600
+        },
+        "spreadSide": "left",
+        "linear": true
+      }
+    ],
+    "nav": [
+      {
+        "label": "Chapter 1",
+        "href": "ch1.xhtml",
+        "path": "OEBPS/ch1.xhtml",
+        "fragment": "",
+        "children": []
+      },
+      {
+        "label": "Chapter 2",
+        "href": "ch2.xhtml",
+        "path": "OEBPS/ch2.xhtml",
+        "fragment": "",
+        "children": []
+      },
+      {
+        "label": "Chapter 3",
+        "href": "ch3.xhtml",
+        "path": "OEBPS/ch3.xhtml",
+        "fragment": "",
+        "children": []
+      },
+      {
+        "label": "Chapter 4",
+        "href": "ch4.xhtml",
+        "path": "OEBPS/ch4.xhtml",
+        "fragment": "",
+        "children": []
+      }
+    ],
+    "hasMediaOverlays": false,
+    "packagePath": "OEBPS/package.opf",
+    "altText": {
+      "images": 0,
+      "described": 0,
+      "decorative": 0,
+      "pagesChecked": 4,
+      "pageCount": 4
+    }
+  },
+  "spreads": {
+    "paired": [
+      {
+        "center": 0
+      },
+      {
+        "left": 1,
+        "right": 2
+      },
+      {
+        "left": 3
+      }
+    ],
+    "single": [
+      {
+        "center": 0
+      },
+      {
+        "center": 1
+      },
+      {
+        "center": 2
+      },
+      {
+        "center": 3
+      }
+    ]
+  },
+  "shifted": {
+    "sides": [
+      "center",
+      "right",
+      "left",
+      "right"
+    ],
+    "paired": [
+      {
+        "center": 0
+      },
+      {
+        "right": 1
+      },
+      {
+        "left": 2,
+        "right": 3
+      }
+    ]
+  },
+  "deferred": {
+    "sides": [
+      "center",
+      "left",
+      "right",
+      "left"
+    ],
+    "viewports": [
+      {
+        "width": 1200,
+        "height": 1600
+      },
+      {
+        "width": 1200,
+        "height": 1600
+      },
+      {
+        "width": 1200,
+        "height": 1600
+      },
+      {
+        "width": 1200,
+        "height": 1600
+      }
+    ]
+  },
+  "measurement": {
+    "pageCount": 4,
+    "viewportCoverage": 0,
+    "viewports": [
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "overlays": {}
+}

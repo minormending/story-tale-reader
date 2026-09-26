@@ -1,0 +1,326 @@
+{
+  "contract": 1,
+  "file": "fxl-no-page-list.epub",
+  "format": "epub",
+  "book": {
+    "format": "epub",
+    "metadata": {
+      "title": "fxl-no-page-list",
+      "creator": "Story Tale Reader fixtures",
+      "language": "en",
+      "identifier": "urn:uuid:fxl-no-page-list",
+      "accessibility": {
+        "features": [],
+        "hazards": [],
+        "accessModes": []
+      }
+    },
+    "layout": "pre-paginated",
+    "layoutInferred": false,
+    "spread": "landscape",
+    "spreadSource": "index-parity",
+    "direction": "ltr",
+    "pages": [
+      {
+        "index": 0,
+        "id": "p1",
+        "path": "OEBPS/p1.xhtml",
+        "viewport": {
+          "width": 800,
+          "height": 1200
+        },
+        "spreadSide": "center",
+        "linear": true
+      },
+      {
+        "index": 1,
+        "id": "p2",
+        "path": "OEBPS/p2.xhtml",
+        "viewport": {
+          "width": 800,
+          "height": 1200
+        },
+        "spreadSide": "left",
+        "linear": true
+      },
+      {
+        "index": 2,
+        "id": "p3",
+        "path": "OEBPS/p3.xhtml",
+        "viewport": {
+          "width": 800,
+          "height": 1200
+        },
+        "spreadSide": "right",
+        "linear": true
+      },
+      {
+        "index": 3,
+        "id": "p4",
+        "path": "OEBPS/p4.xhtml",
+        "viewport": {
+          "width": 800,
+          "height": 1200
+        },
+        "spreadSide": "left",
+        "linear": true
+      },
+      {
+        "index": 4,
+        "id": "p5",
+        "path": "OEBPS/p5.xhtml",
+        "viewport": {
+          "width": 800,
+          "height": 1200
+        },
+        "spreadSide": "right",
+        "linear": true
+      },
+      {
+        "index": 5,
+        "id": "p6",
+        "path": "OEBPS/p6.xhtml",
+        "viewport": {
+          "width": 800,
+          "height": 1200
+        },
+        "spreadSide": "left",
+        "linear": true
+      },
+      {
+        "index": 6,
+        "id": "p7",
+        "path": "OEBPS/p7.xhtml",
+        "viewport": {
+          "width": 800,
+          "height": 1200
+        },
+        "spreadSide": "right",
+        "linear": true
+      },
+      {
+        "index": 7,
+        "id": "p8",
+        "path": "OEBPS/p8.xhtml",
+        "viewport": {
+          "width": 800,
+          "height": 1200
+        },
+        "spreadSide": "left",
+        "linear": true
+      },
+      {
+        "index": 8,
+        "id": "p9",
+        "path": "OEBPS/p9.xhtml",
+        "viewport": {
+          "width": 800,
+          "height": 1200
+        },
+        "spreadSide": "right",
+        "linear": true
+      }
+    ],
+    "nav": [
+      {
+        "label": "Start",
+        "href": "p1.xhtml",
+        "path": "OEBPS/p1.xhtml",
+        "fragment": "",
+        "children": []
+      }
+    ],
+    "coverPath": "OEBPS/images/p1.jpg",
+    "hasMediaOverlays": false,
+    "packagePath": "OEBPS/package.opf",
+    "altText": {
+      "images": 9,
+      "described": 0,
+      "decorative": 9,
+      "pagesChecked": 9,
+      "pageCount": 9
+    }
+  },
+  "spreads": {
+    "paired": [
+      {
+        "center": 0
+      },
+      {
+        "left": 1,
+        "right": 2
+      },
+      {
+        "left": 3,
+        "right": 4
+      },
+      {
+        "left": 5,
+        "right": 6
+      },
+      {
+        "left": 7,
+        "right": 8
+      }
+    ],
+    "single": [
+      {
+        "center": 0
+      },
+      {
+        "center": 1
+      },
+      {
+        "center": 2
+      },
+      {
+        "center": 3
+      },
+      {
+        "center": 4
+      },
+      {
+        "center": 5
+      },
+      {
+        "center": 6
+      },
+      {
+        "center": 7
+      },
+      {
+        "center": 8
+      }
+    ]
+  },
+  "shifted": {
+    "sides": [
+      "center",
+      "right",
+      "left",
+      "right",
+      "left",
+      "right",
+      "left",
+      "right",
+      "left"
+    ],
+    "paired": [
+      {
+        "center": 0
+      },
+      {
+        "right": 1
+      },
+      {
+        "left": 2,
+        "right": 3
+      },
+      {
+        "left": 4,
+        "right": 5
+      },
+      {
+        "left": 6,
+        "right": 7
+      },
+      {
+        "left": 8
+      }
+    ]
+  },
+  "deferred": {
+    "sides": [
+      "center",
+      "left",
+      "right",
+      "left",
+      "right",
+      "left",
+      "right",
+      "left",
+      "right"
+    ],
+    "viewports": [
+      {
+        "width": 1200,
+        "height": 1600
+      },
+      {
+        "width": 1200,
+        "height": 1600
+      },
+      {
+        "width": 1200,
+        "height": 1600
+      },
+      {
+        "width": 1200,
+        "height": 1600
+      },
+      {
+        "width": 1200,
+        "height": 1600
+      },
+      {
+        "width": 1200,
+        "height": 1600
+      },
+      {
+        "width": 1200,
+        "height": 1600
+      },
+      {
+        "width": 1200,
+        "height": 1600
+      },
+      {
+        "width": 1200,
+        "height": 1600
+      }
+    ]
+  },
+  "measurement": {
+    "pageCount": 9,
+    "viewportCoverage": 0,
+    "viewports": [
+      {
+        "width": 800,
+        "height": 1200
+      },
+      {
+        "width": 800,
+        "height": 1200
+      },
+      {
+        "width": 800,
+        "height": 1200
+      },
+      {
+        "width": 800,
+        "height": 1200
+      },
+      {
+        "width": 800,
+        "height": 1200
+      },
+      {
+        "width": 800,
+        "height": 1200
+      },
+      {
+        "width": 800,
+        "height": 1200
+      },
+      {
+        "width": 800,
+        "height": 1200
+      },
+      {
+        "width": 800,
+        "height": 1200
+      }
+    ]
+  },
+  "overlays": {}
+}

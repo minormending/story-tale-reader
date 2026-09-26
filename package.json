@@ -12,6 +12,7 @@
     "typecheck": "tsc -b",
     "test": "vitest run",
     "test:watch": "vitest",
+    "contract": "UPDATE_CONTRACT=1 vitest run src/engine/contract.test.ts",
     "icons": "node scripts/make-icons.mjs && npx @capacitor/assets generate --android",
     "android:sync": "npm run build && npx cap sync android",
     "android:open": "npx cap open android",

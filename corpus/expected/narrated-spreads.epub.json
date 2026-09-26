@@ -1,0 +1,434 @@
+{
+  "contract": 1,
+  "file": "narrated-spreads.epub",
+  "format": "epub",
+  "book": {
+    "format": "epub",
+    "metadata": {
+      "title": "Narrated Spreads",
+      "creator": "Story Tale Reader fixtures",
+      "language": "en",
+      "identifier": "urn:uuid:narrated-spreads",
+      "accessibility": {
+        "features": [],
+        "hazards": [],
+        "accessModes": []
+      }
+    },
+    "layout": "pre-paginated",
+    "layoutInferred": false,
+    "spread": "landscape",
+    "spreadSource": "explicit",
+    "direction": "ltr",
+    "pages": [
+      {
+        "index": 0,
+        "id": "p1",
+        "path": "OEBPS/p1.xhtml",
+        "viewport": {
+          "width": 800,
+          "height": 1200
+        },
+        "spreadSide": "center",
+        "printedPage": "1",
+        "linear": true,
+        "overlayPath": "OEBPS/smil/p1.smil"
+      },
+      {
+        "index": 1,
+        "id": "p2",
+        "path": "OEBPS/p2.xhtml",
+        "viewport": {
+          "width": 800,
+          "height": 1200
+        },
+        "spreadSide": "left",
+        "printedPage": "2",
+        "linear": true,
+        "overlayPath": "OEBPS/smil/p2.smil"
+      },
+      {
+        "index": 2,
+        "id": "p3",
+        "path": "OEBPS/p3.xhtml",
+        "viewport": {
+          "width": 800,
+          "height": 1200
+        },
+        "spreadSide": "right",
+        "printedPage": "3",
+        "linear": true,
+        "overlayPath": "OEBPS/smil/p3.smil"
+      },
+      {
+        "index": 3,
+        "id": "p4",
+        "path": "OEBPS/p4.xhtml",
+        "viewport": {
+          "width": 800,
+          "height": 1200
+        },
+        "spreadSide": "left",
+        "printedPage": "4",
+        "linear": true,
+        "overlayPath": "OEBPS/smil/p4.smil"
+      },
+      {
+        "index": 4,
+        "id": "p5",
+        "path": "OEBPS/p5.xhtml",
+        "viewport": {
+          "width": 800,
+          "height": 1200
+        },
+        "spreadSide": "right",
+        "printedPage": "5",
+        "linear": true,
+        "overlayPath": "OEBPS/smil/p5.smil"
+      },
+      {
+        "index": 5,
+        "id": "p6",
+        "path": "OEBPS/p6.xhtml",
+        "viewport": {
+          "width": 800,
+          "height": 1200
+        },
+        "spreadSide": "left",
+        "printedPage": "6",
+        "linear": true
+      },
+      {
+        "index": 6,
+        "id": "p7",
+        "path": "OEBPS/p7.xhtml",
+        "viewport": {
+          "width": 800,
+          "height": 1200
+        },
+        "spreadSide": "right",
+        "printedPage": "7",
+        "linear": true
+      }
+    ],
+    "nav": [
+      {
+        "label": "Start",
+        "href": "p1.xhtml",
+        "path": "OEBPS/p1.xhtml",
+        "fragment": "",
+        "children": []
+      }
+    ],
+    "coverPath": "OEBPS/images/p1.jpg",
+    "hasMediaOverlays": true,
+    "activeClass": "-epub-media-overlay-active",
+    "packagePath": "OEBPS/package.opf",
+    "altText": {
+      "images": 7,
+      "described": 0,
+      "decorative": 7,
+      "pagesChecked": 7,
+      "pageCount": 7
+    }
+  },
+  "spreads": {
+    "paired": [
+      {
+        "center": 0
+      },
+      {
+        "left": 1,
+        "right": 2
+      },
+      {
+        "left": 3,
+        "right": 4
+      },
+      {
+        "left": 5,
+        "right": 6
+      }
+    ],
+    "single": [
+      {
+        "center": 0
+      },
+      {
+        "center": 1
+      },
+      {
+        "center": 2
+      },
+      {
+        "center": 3
+      },
+      {
+        "center": 4
+      },
+      {
+        "center": 5
+      },
+      {
+        "center": 6
+      }
+    ]
+  },
+  "shifted": {
+    "sides": [
+      "center",
+      "right",
+      "left",
+      "right",
+      "left",
+      "right",
+      "left"
+    ],
+    "paired": [
+      {
+        "center": 0
+      },
+      {
+        "right": 1
+      },
+      {
+        "left": 2,
+        "right": 3
+      },
+      {
+        "left": 4,
+        "right": 5
+      },
+      {
+        "left": 6
+      }
+    ]
+  },
+  "deferred": {
+    "sides": [
+      "center",
+      "left",
+      "right",
+      "left",
+      "right",
+      "left",
+      "right"
+    ],
+    "viewports": [
+      {
+        "width": 1200,
+        "height": 1600
+      },
+      {
+        "width": 1200,
+        "height": 1600
+      },
+      {
+        "width": 1200,
+        "height": 1600
+      },
+      {
+        "width": 1200,
+        "height": 1600
+      },
+      {
+        "width": 1200,
+        "height": 1600
+      },
+      {
+        "width": 1200,
+        "height": 1600
+      },
+      {
+        "width": 1200,
+        "height": 1600
+      }
+    ]
+  },
+  "measurement": {
+    "pageCount": 7,
+    "viewportCoverage": 0,
+    "viewports": [
+      {
+        "width": 800,
+        "height": 1200
+      },
+      {
+        "width": 800,
+        "height": 1200
+      },
+      {
+        "width": 800,
+        "height": 1200
+      },
+      {
+        "width": 800,
+        "height": 1200
+      },
+      {
+        "width": 800,
+        "height": 1200
+      },
+      {
+        "width": 800,
+        "height": 1200
+      },
+      {
+        "width": 800,
+        "height": 1200
+      }
+    ]
+  },
+  "overlays": {
+    "OEBPS/smil/p1.smil": [
+      {
+        "textPath": "OEBPS/p1.xhtml",
+        "fragment": "w1-1",
+        "audioPath": "OEBPS/audio/p1.wav",
+        "start": 0,
+        "end": 0.4
+      },
+      {
+        "textPath": "OEBPS/p1.xhtml",
+        "fragment": "w1-2",
+        "audioPath": "OEBPS/audio/p1.wav",
+        "start": 0.4,
+        "end": 0.8
+      },
+      {
+        "textPath": "OEBPS/p1.xhtml",
+        "fragment": "w1-3",
+        "audioPath": "OEBPS/audio/p1.wav",
+        "start": 0.8,
+        "end": 1.2
+      },
+      {
+        "textPath": "OEBPS/p1.xhtml",
+        "fragment": "w1-4",
+        "audioPath": "OEBPS/audio/p1.wav",
+        "start": 1.2,
+        "end": 1.6
+      }
+    ],
+    "OEBPS/smil/p2.smil": [
+      {
+        "textPath": "OEBPS/p2.xhtml",
+        "fragment": "w2-1",
+        "audioPath": "OEBPS/audio/p2.wav",
+        "start": 0,
+        "end": 0.4
+      },
+      {
+        "textPath": "OEBPS/p2.xhtml",
+        "fragment": "w2-2",
+        "audioPath": "OEBPS/audio/p2.wav",
+        "start": 0.4,
+        "end": 0.8
+      },
+      {
+        "textPath": "OEBPS/p2.xhtml",
+        "fragment": "w2-3",
+        "audioPath": "OEBPS/audio/p2.wav",
+        "start": 0.8,
+        "end": 1.2
+      },
+      {
+        "textPath": "OEBPS/p2.xhtml",
+        "fragment": "w2-4",
+        "audioPath": "OEBPS/audio/p2.wav",
+        "start": 1.2,
+        "end": 1.6
+      }
+    ],
+    "OEBPS/smil/p3.smil": [
+      {
+        "textPath": "OEBPS/p3.xhtml",
+        "fragment": "w3-1",
+        "audioPath": "OEBPS/audio/p3.wav",
+        "start": 0,
+        "end": 0.4
+      },
+      {
+        "textPath": "OEBPS/p3.xhtml",
+        "fragment": "w3-2",
+        "audioPath": "OEBPS/audio/p3.wav",
+        "start": 0.4,
+        "end": 0.8
+      },
+      {
+        "textPath": "OEBPS/p3.xhtml",
+        "fragment": "w3-3",
+        "audioPath": "OEBPS/audio/p3.wav",
+        "start": 0.8,
+        "end": 1.2
+      },
+      {
+        "textPath": "OEBPS/p3.xhtml",
+        "fragment": "w3-4",
+        "audioPath": "OEBPS/audio/p3.wav",
+        "start": 1.2,
+        "end": 1.6
+      }
+    ],
+    "OEBPS/smil/p4.smil": [
+      {
+        "textPath": "OEBPS/p4.xhtml",
+        "fragment": "w4-1",
+        "audioPath": "OEBPS/audio/p4.wav",
+        "start": 0,
+        "end": 0.4
+      },
+      {
+        "textPath": "OEBPS/p4.xhtml",
+        "fragment": "w4-2",
+        "audioPath": "OEBPS/audio/p4.wav",
+        "start": 0.4,
+        "end": 0.8
+      },
+      {
+        "textPath": "OEBPS/p4.xhtml",
+        "fragment": "w4-3",
+        "audioPath": "OEBPS/audio/p4.wav",
+        "start": 0.8,
+        "end": 1.2
+      },
+      {
+        "textPath": "OEBPS/p4.xhtml",
+        "fragment": "w4-4",
+        "audioPath": "OEBPS/audio/p4.wav",
+        "start": 1.2,
+        "end": 1.6
+      }
+    ],
+    "OEBPS/smil/p5.smil": [
+      {
+        "textPath": "OEBPS/p5.xhtml",
+        "fragment": "w5-1",
+        "audioPath": "OEBPS/audio/p5.wav",
+        "start": 0,
+        "end": 0.4
+      },
+      {
+        "textPath": "OEBPS/p5.xhtml",
+        "fragment": "w5-2",
+        "audioPath": "OEBPS/audio/p5.wav",
+        "start": 0.4,
+        "end": 0.8
+      },
+      {
+        "textPath": "OEBPS/p5.xhtml",
+        "fragment": "w5-3",
+        "audioPath": "OEBPS/audio/p5.wav",
+        "start": 0.8,
+        "end": 1.2
+      },
+      {
+        "textPath": "OEBPS/p5.xhtml",
+        "fragment": "w5-4",
+        "audioPath": "OEBPS/audio/p5.wav",
+        "start": 1.2,
+        "end": 1.6
+      }
+    ]
+  }
+}
