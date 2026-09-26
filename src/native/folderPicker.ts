@@ -9,6 +9,7 @@
 
 import { registerPlugin } from '@capacitor/core'
 import { isNative } from './bookIntent'
+import { readNativeCopy } from './nativeCopy'
 
 interface PickedBook {
   uri: string
@@ -18,7 +19,8 @@ interface PickedBook {
 
 interface FolderPickerPlugin {
   pick(): Promise<{ cancelled: boolean; books: PickedBook[] }>
-  read(options: { uri: string }): Promise<{ data: string }>
+  read(options: { uri: string }): Promise<{ path: string; size: number }>
+  discard(options: { path: string }): Promise<void>
 }
 
 const plugin = registerPlugin<FolderPickerPlugin>('FolderPicker')
@@ -55,11 +57,8 @@ export async function pickFolder(): Promise<BookSource[] | undefined> {
   return result.books.map((book) => ({
     name: book.name,
     load: async () => {
-      const { data } = await plugin.read({ uri: book.uri })
-      // Decoded by the browser rather than by hand: atob and a byte loop are
-      // dramatically slower across tens of megabytes.
-      const response = await fetch(`data:application/octet-stream;base64,${data}`)
-      return new File([await response.blob()], book.name)
+      const { path } = await plugin.read({ uri: book.uri })
+      return readNativeCopy(path, book.name, (copy) => plugin.discard({ path: copy }))
     },
   }))
 }

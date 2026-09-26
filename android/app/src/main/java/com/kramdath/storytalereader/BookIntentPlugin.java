@@ -4,7 +4,6 @@ import android.content.ContentResolver;
 import android.database.Cursor;
 import android.net.Uri;
 import android.provider.OpenableColumns;
-import android.util.Base64;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -12,23 +11,19 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
-import java.io.ByteArrayOutputStream;
-import java.io.InputStream;
+import java.io.File;
 
 /**
  * Hands a book opened from outside the app (a file manager's "Open with", or the
  * share sheet) to the web layer.
  *
- * The bytes cross the bridge base64-encoded. That is not free, but the web layer
- * stores books in OPFS, which native code cannot write to, so there is no shared
- * filesystem to hand a path across instead. Children's picture books are tens of
- * megabytes, which is comfortably within budget; anything larger is refused with a
- * clear message rather than risking an out-of-memory kill.
+ * The book is streamed into the app's cache (IncomingFiles) and its path handed
+ * over; the web layer reads it through Capacitor's local server and then asks for
+ * the copy to be discarded. Nothing the size of the book passes through the bridge
+ * or sits in the Java heap.
  */
 @CapacitorPlugin(name = "BookIntent")
 public class BookIntentPlugin extends Plugin {
-
-    private static final long MAX_BYTES = 150L * 1024 * 1024;
 
     private static Uri pending;
     private static BookIntentPlugin instance;
@@ -36,6 +31,7 @@ public class BookIntentPlugin extends Plugin {
     @Override
     public void load() {
         instance = this;
+        IncomingFiles.clearStale(getContext());
     }
 
     /** Called by MainActivity when an intent carrying a book arrives. */
@@ -58,36 +54,25 @@ public class BookIntentPlugin extends Plugin {
             return;
         }
 
-        try {
-            ContentResolver resolver = getContext().getContentResolver();
-            byte[] bytes = readAll(resolver, uri);
-            result.put("available", true);
-            result.put("name", displayName(resolver, uri));
-            result.put("data", Base64.encodeToString(bytes, Base64.NO_WRAP));
-            call.resolve(result);
-        } catch (OutOfMemoryError error) {
-            call.reject("That book is too large to open this way. Add it from the app instead.");
-        } catch (Exception error) {
-            call.reject("Could not read that file: " + error.getMessage());
-        }
+        // Copying can take a few seconds for a large book; keep it off the bridge thread.
+        new Thread(() -> {
+            try {
+                File copy = IncomingFiles.copy(getContext(), uri);
+                result.put("available", true);
+                result.put("name", displayName(getContext().getContentResolver(), uri));
+                result.put("path", copy.getAbsolutePath());
+                result.put("size", copy.length());
+                call.resolve(result);
+            } catch (Exception error) {
+                call.reject("Could not open that book: " + error.getMessage());
+            }
+        }, "book-intent-copy").start();
     }
 
-    private byte[] readAll(ContentResolver resolver, Uri uri) throws Exception {
-        try (InputStream input = resolver.openInputStream(uri)) {
-            if (input == null) throw new IllegalStateException("the file could not be opened");
-            ByteArrayOutputStream output = new ByteArrayOutputStream();
-            byte[] buffer = new byte[64 * 1024];
-            long total = 0;
-            int read;
-            while ((read = input.read(buffer)) != -1) {
-                total += read;
-                if (total > MAX_BYTES) {
-                    throw new IllegalStateException("the file is larger than 150 MB");
-                }
-                output.write(buffer, 0, read);
-            }
-            return output.toByteArray();
-        }
+    @PluginMethod
+    public void discard(PluginCall call) {
+        IncomingFiles.discard(getContext(), call.getString("path"));
+        call.resolve();
     }
 
     private String displayName(ContentResolver resolver, Uri uri) {

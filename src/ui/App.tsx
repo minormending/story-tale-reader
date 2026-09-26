@@ -231,7 +231,14 @@ export function App() {
   useEffect(() => {
     let handle: { remove: () => Promise<void> } | undefined
     const collect = async (): Promise<void> => {
-      const file = await takeIncomingBook()
+      let file: File | undefined
+      try {
+        file = await takeIncomingBook()
+      } catch (cause) {
+        // Say why, rather than opening to an unchanged shelf as if nothing was asked.
+        setError(cause instanceof Error ? cause.message : String(cause))
+        return
+      }
       if (file) await openFile(file)
     }
     void collect()
