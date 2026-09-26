@@ -45,6 +45,14 @@ export interface LibraryEntry {
   seriesIndex?: number
   hasMediaOverlays: boolean
   cover?: Blob
+  /**
+   * Which version of the cover maker last tried, when it produced nothing.
+   *
+   * A missing cover is retried (repairCovers) while this is older than
+   * COVER_VERSION, so a fix to the cover maker reaches books already on the shelf,
+   * and a book that simply has no picture is not re-read on every launch.
+   */
+  coverVersion?: number
 }
 
 export interface Progress {
@@ -74,6 +82,14 @@ export interface OpenedBook {
 }
 
 const THUMBNAIL_WIDTH = 480
+
+/**
+ * Bumped when the cover maker changes in a way that could now succeed where it
+ * failed before. 3: PDF covers, which until 0.13.1 always failed (see
+ * renderPdfPage), and which drew scanned pages blank until pdf.js was given its
+ * JPEG 2000 and JBIG2 decoders.
+ */
+const COVER_VERSION = 3
 
 /** Stable identity from the file's head and size, so re-importing replaces rather than duplicates. */
 export async function fingerprint(file: Blob): Promise<string> {
@@ -193,10 +209,52 @@ export async function importBook(
     seriesIndex: opened.book.metadata.seriesIndex,
     hasMediaOverlays: opened.book.hasMediaOverlays,
     cover: existing?.cover ?? (await makeCover(opened)),
+    coverVersion: existing?.cover ? existing.coverVersion : COVER_VERSION,
   }
   const listed = await saveEntry(entry)
   await rememberMeasurement(id, opened.measurement)
   return { entry, ...opened, persisted: stored && listed }
+}
+
+/**
+ * Go back for covers an earlier version of the cover maker could not make.
+ *
+ * Every PDF added before 0.13.1 arrived without a cover, or with a blank one.
+ * Nothing else would ever fix those entries — adding the file again would, but
+ * adding a folder skips books already on the shelf — so each gets one more try from
+ * its stored file, one book at a time, reported as it lands. `stop` is asked between books, so the work gives
+ * way the moment somebody opens something to read.
+ */
+export async function repairCovers(
+  onRepaired: (entry: LibraryEntry) => void,
+  stop: () => boolean,
+): Promise<void> {
+  // Missing covers, and PDF covers from before the decoders, which may be blank.
+  const due = (entry: LibraryEntry) =>
+    (entry.coverVersion ?? 1) < COVER_VERSION && (!entry.cover || entry.format === 'pdf')
+  for (const candidate of (await listLibrary()).filter(due)) {
+    if (stop()) return
+    let cover: Blob | undefined
+    try {
+      const blob = await loadBookFile(candidate.id)
+      if (!blob) continue
+      const opened = await parse(blob, candidate.fileName, undefined, { measure: false })
+      try {
+        cover = await makeCover(opened)
+      } finally {
+        await opened.pdf?.loadingTask.destroy()
+      }
+    } catch {
+      // A book that no longer parses is left for opening it to explain.
+    }
+    // Read again before writing: the entry may have been opened, and so updated,
+    // while its cover was being made.
+    const current = await get<LibraryEntry>(STORE_BOOKS, candidate.id)
+    if (!current || !due(current) || stop()) continue
+    const repaired: LibraryEntry = { ...current, cover: cover ?? current.cover, coverVersion: COVER_VERSION }
+    await saveEntry(repaired)
+    if (cover) onRepaired(repaired)
+  }
 }
 
 /**
@@ -315,9 +373,9 @@ async function pdfCover(document: PDFDocumentProxy): Promise<Blob | undefined> {
     const page = await document.getPage(1)
     const base = page.getViewport({ scale: 1 })
     const scale = THUMBNAIL_WIDTH / base.width
-    const canvas = new OffscreenCanvas(1, 1) as unknown as HTMLCanvasElement
+    const canvas = new OffscreenCanvas(1, 1)
     await renderPdfPage(document, 1, canvas, scale, 1)
-    return await (canvas as unknown as OffscreenCanvas).convertToBlob({
+    return await canvas.convertToBlob({
       type: 'image/webp',
       quality: 0.82,
     })
