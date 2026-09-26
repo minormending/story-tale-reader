@@ -195,18 +195,22 @@ export function ReflowableViewer({
     [screenCount, sectionIndex, sections.length],
   )
 
-  const forward = book.direction === 'rtl' ? -1 : 1
+  /** The step taken by going right; backwards in a right-to-left book. See Viewer. */
+  const rightStep = book.direction === 'rtl' ? -1 : 1
 
   const onKey = useCallback(
     (event: KeyboardEvent): void => {
-      if (event.key === 'ArrowRight' || event.key === 'PageDown' || event.key === ' ') turn(forward)
-      else if (event.key === 'ArrowLeft' || event.key === 'PageUp') turn(-forward)
+      // Arrows go the way they point on the page; PageDown and Space mean "next".
+      if (event.key === 'ArrowRight') turn(rightStep)
+      else if (event.key === 'ArrowLeft') turn(-rightStep)
+      else if (event.key === 'PageDown' || event.key === ' ') turn(1)
+      else if (event.key === 'PageUp') turn(-1)
       else if (event.key === 'Escape') {
         if (menuOpen) setMenuOpen(false)
         else if (!locked) onClose()
       }
     },
-    [turn, forward, onClose, menuOpen, locked],
+    [turn, rightStep, onClose, menuOpen, locked],
   )
 
   useEffect(() => {
@@ -225,7 +229,7 @@ export function ReflowableViewer({
   const attachPageKeys = usePageKeys(onKey)
 
   const gestures = usePageGestures({
-    onTurn: (direction) => turn(direction * forward),
+    onTurn: (direction) => turn(direction * rightStep),
     onToggleChrome: () => setChromeVisible((visible) => !visible),
   })
 
@@ -509,7 +513,7 @@ export function ReflowableViewer({
       <footer className={`chrome chrome-bottom${chromeVisible ? '' : ' hidden'}`}>
         <button
           className="icon-button"
-          onClick={() => turn(-forward)}
+          onClick={() => turn(-1)}
           disabled={sectionIndex === 0 && screen <= 0}
         >
           Previous
@@ -519,7 +523,7 @@ export function ReflowableViewer({
         </span>
         <button
           className="icon-button"
-          onClick={() => turn(forward)}
+          onClick={() => turn(1)}
           disabled={sectionIndex >= sections.length - 1 && screen >= screenCount - 1}
         >
           Next
