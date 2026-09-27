@@ -288,6 +288,7 @@
     ]
   },
   "measurement": {
+    "version": 2,
     "pageCount": 9,
     "viewportCoverage": 0,
     "viewports": [

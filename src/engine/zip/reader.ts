@@ -62,6 +62,7 @@ const CACHE_BUDGET_BYTES = 48 * 1024 * 1024
 export class ZipArchive {
   private readonly cache = new Map<string, Uint8Array>()
   private cacheBytes = 0
+  private transform?: (path: string, bytes: Uint8Array) => Uint8Array
 
   private constructor(
     private readonly source: ByteSource,
@@ -116,8 +117,20 @@ export class ZipArchive {
       throw new ZipError(`Unsupported compression method ${entry.compressionMethod} for ${path}`)
     }
 
+    if (this.transform) out = this.transform(key, out)
     this.remember(key, out)
     return out
+  }
+
+  /**
+   * Rewrite entries as they are read, before they are cached: how an obfuscated
+   * font (epub/obfuscation.ts) reaches the page already undone, whichever route
+   * the page is served by.
+   */
+  setTransform(transform: (path: string, bytes: Uint8Array) => Uint8Array): void {
+    this.transform = transform
+    this.cache.clear()
+    this.cacheBytes = 0
   }
 
   async readText(path: string): Promise<string> {

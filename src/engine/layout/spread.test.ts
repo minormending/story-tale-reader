@@ -81,6 +81,22 @@ describe('assignSpreadSides', () => {
     expect(sides[2]).toBe('center')
   })
 
+  it('lets a page wider than it is tall stand alone, even when every page is one', () => {
+    // A book converted from Kindle fixed layout: each document is a whole spread,
+    // all the same size, so none is wider than the book's usual page.
+    const spread = { width: 2581, height: 1748 }
+    const pages = candidates(4).map((page, index) => ({ ...page, viewport: index === 0 ? { width: 522, height: 706 } : spread }))
+    const { sides } = assignSpreadSides(pages, { pageList: new Map(), direction: 'ltr', modal: spread })
+    expect(sides).toEqual(['center', 'center', 'center', 'center'])
+  })
+
+  it('still pairs near-square pages, whose facing pages are a real spread', () => {
+    const square = { width: 752, height: 732 }
+    const pages = candidates(3).map((page) => ({ ...page, viewport: square }))
+    const { sides } = assignSpreadSides(pages, { pageList: new Map(), direction: 'ltr', modal: square })
+    expect(sides).toEqual(['center', 'left', 'right'])
+  })
+
   it('mirrors sides for right-to-left books', () => {
     const input = candidates(5)
     const pageList = new Map(input.map((c, i) => [c.path, String(i + 1)]))

@@ -243,7 +243,7 @@ Resolve in priority order; first hit wins.
 2. OPF `<meta property="rendition:layout">`.
 3. `META-INF/com.apple.ibooks.display-options.xml` → `<option name="fixed-layout">true</option>` (legacy; **present in the reference book**).
 4. Legacy Kindle `<meta name="fixed-layout" content="true">`.
-5. Heuristic: ≥80% of spine documents contain a `<meta name="viewport">` with explicit pixel `width` **and** `height`.
+5. Heuristic: ≥80% of spine documents contain a `<meta name="viewport">` with explicit pixel `width` **and** `height` — or declare the same thing in CSS: the body, or the one box inside it, sized in pixels on both sides (`src/engine/layout/css.ts`). The CSS form is how a book converted from Kindle fixed layout by Calibre says it; without it such a book was read as reflowable, its 2581px pages poured into columns and their absolutely positioned text laid over itself.
 6. Default `reflowable`.
 7. `BookOverrides.forceLayout` beats all of the above.
 
@@ -253,9 +253,15 @@ Per spine document, in priority order:
 
 1. OPF `<meta property="rendition:viewport">` → `width=800, height=1200`.
 2. The document's own `<meta name="viewport" content="width=800, height=1200">` ← the reference book.
-3. Intrinsic pixel dimensions of the document's first/largest `<img>` or root `<svg viewBox>`.
-4. Fall back to the book's modal viewport across all pages.
-5. Last resort 1200 × 1600, and flag the book as "layout uncertain" in the UI.
+3. A fixed-size box declared in the document's CSS (see §5.1).
+4. Intrinsic pixel dimensions of the document's first/largest `<img>` or root `<svg viewBox>`.
+5. Fall back to the book's modal viewport across all pages.
+6. Last resort 1200 × 1600, and flag the book as "layout uncertain" in the UI.
+
+Embedded fonts obfuscated under the IDPF or Adobe schemes (listed in
+`META-INF/encryption.xml`; not DRM) are undone as the archive is read
+(`src/engine/epub/obfuscation.ts`), so a fixed page's text is set in the font its lines
+were placed for rather than overflowing its boxes in a fallback.
 
 Mixed viewports within one book are legal (e.g. a 1600 × 1200 pre-composed spread
 page sitting among 800 × 1200 single pages). The layout engine must handle a page
@@ -282,6 +288,9 @@ resolveSpreads(spine, nav, direction, overrides):
   # 3. Derive from viewport aspect ratio
   if a page's viewport is ~2× as wide as the book's modal page:
     side = center                            # a pre-composed full spread
+  if a page is at least 1.2× as wide as it is tall:
+    side = center                            # a landscape page, or a Kindle
+                                             # conversion's whole-spread page
 
   # 4. Fall back to index parity, cover alone
   side = (index == 0) ? center

@@ -5,6 +5,7 @@ import { dirname, resolvePath } from '../path'
 import { findPackagePath, detectDrm, DrmError } from './ocf'
 import { parsePackageDocument, spineItems, hasMediaOverlays, type PackageDocument } from './opf'
 import { addAltCounts, countAltText, EMPTY_ALT_COUNT } from './altText'
+import { deobfuscate, obfuscatedResources, obfuscationKey, type Obfuscation } from './obfuscation'
 import { parseNavDocument, parseNcx, emptyNav, type NavDocument } from './nav'
 import {
   detectLayout, layoutFromSpineProperties, parseSpreadPolicy, parseIbooksDisplayOptions,
@@ -12,6 +13,8 @@ import {
 import {
   viewportFromDocument, primaryImageHref, imageSize, modalViewport, DEFAULT_VIEWPORT,
 } from '../layout/viewport'
+import { fixedBoxViewport, inlineStylesheets, parseClassRules, stylesheetHrefs, type ClassRules } from '../layout/css'
+import { parseXml } from '../xml'
 import { assignSpreadSides, type SpreadCandidate } from '../layout/spread'
 import type {
   BookPage,
@@ -23,6 +26,7 @@ import type {
 
 const IBOOKS_OPTIONS = 'META-INF/com.apple.ibooks.display-options.xml'
 const CONTAINER = 'META-INF/container.xml'
+const ENCRYPTION = 'META-INF/encryption.xml'
 
 /** How many spine documents to sample when the book declares no layout. */
 const DETECTION_SAMPLE = 12
@@ -44,6 +48,13 @@ function yieldToPaint(): Promise<void> {
 }
 
 /**
+ * Bumped when measuring changes what it finds, so measurements taken before are
+ * taken again. 2: page sizes declared in CSS (layout/css.ts), without which a book
+ * converted from Kindle fixed layout measured as reflowable, and stayed that way.
+ */
+export const MEASUREMENT_VERSION = 2
+
+/**
  * What a previous open measured, and what this one measured.
  *
  * Measuring is the expensive half of opening a fixed-layout book: every page
@@ -56,6 +67,8 @@ function yieldToPaint(): Promise<void> {
  * than the input would have to be invalidated on every such change.
  */
 export interface LayoutMeasurement {
+  /** Which way of measuring produced this; an older one is measured again. */
+  version?: number
   /** Spine length this was measured against, so a mismatch discards it. */
   pageCount: number
   /** Share of sampled documents carrying a viewport, for layout detection. */
@@ -115,6 +128,7 @@ export async function loadEpub(
   }
 
   const pkg = parsePackageDocument(await archive.readText(packagePath), packagePath)
+  await undoFontObfuscation(archive, pkg)
   const nav = await loadNavigation(archive, pkg)
 
   const entries = spineItems(pkg)
@@ -128,7 +142,9 @@ export async function loadEpub(
 
   const declaredLayout = pkg.meta.get('rendition:layout')
   const { cached, measure = true } = options
-  const usable = cached && cached.pageCount === entries.length ? cached : undefined
+  const usable =
+    cached && cached.pageCount === entries.length && cached.version === MEASUREMENT_VERSION ? cached : undefined
+  const sizes = cssPageSizes(archive)
   const needsSampling = !declaredLayout && !ibooksFixedLayout && !usable
   let viewportCoverage = usable?.viewportCoverage ?? 0
   if (needsSampling) {
@@ -136,7 +152,7 @@ export async function loadEpub(
     let withViewport = 0
     for (const { item } of sample) {
       const xml = await safeReadText(archive, item.path)
-      if (xml && viewportFromDocument(xml)) withViewport++
+      if (xml && (viewportFromDocument(xml) || (await sizes(item.path, xml)))) withViewport++
     }
     viewportCoverage = sample.length ? withViewport / sample.length : 0
   }
@@ -167,7 +183,7 @@ export async function loadEpub(
       const measured = !fixed && !usable
       report({ stage: 'measuring', done: 0, total: entries.length })
       for (const [index, { item }] of entries.entries()) {
-        viewports.push(fixed ?? usable?.viewports[index] ?? (await resolvePageViewport(archive, item.path)))
+        viewports.push(fixed ?? usable?.viewports[index] ?? (await resolvePageViewport(archive, item.path, sizes)))
         if (!measured) continue
         report({ stage: 'measuring', done: index + 1, total: entries.length })
         if ((index + 1) % YIELD_EVERY === 0) await yieldToPaint()
@@ -259,12 +275,44 @@ export async function loadEpub(
     // The raw measurement, whether it came from the cache or was taken just now, so
     // a caller that had nothing to pass in has something to keep.
     measurement: {
+      version: MEASUREMENT_VERSION,
       pageCount: entries.length,
       viewportCoverage,
       viewports:
         overrides.viewportOverride || !measure ? (usable?.viewports ?? []) : viewports,
     },
   }
+}
+
+/**
+ * Have the archive hand out obfuscated fonts already undone (epub/obfuscation.ts).
+ * A key that cannot be made leaves that scheme's fonts as they are, which is what
+ * happened to all of them before: the text falls back to another face.
+ */
+async function undoFontObfuscation(archive: ZipArchive, pkg: PackageDocument): Promise<void> {
+  if (!archive.has(ENCRYPTION)) return
+  const identifier = pkg.metadata.identifier
+  if (!identifier) return
+  let resources: Map<string, Obfuscation>
+  try {
+    resources = obfuscatedResources(await archive.readText(ENCRYPTION))
+  } catch {
+    return
+  }
+  if (resources.size === 0) return
+
+  const keys = new Map<Obfuscation, Uint8Array>()
+  for (const kind of new Set(resources.values())) {
+    const key = await obfuscationKey(kind, identifier)
+    if (key) keys.set(kind, key)
+  }
+  if (keys.size === 0) return
+
+  archive.setTransform((path, bytes) => {
+    const kind = resources.get(path)
+    const key = kind ? keys.get(kind) : undefined
+    return kind && key ? deobfuscate(bytes, key, kind) : bytes
+  })
 }
 
 function findLooseOpf(archive: ZipArchive): string | undefined {
@@ -303,12 +351,36 @@ function parsePackageViewport(pkg: PackageDocument): Viewport | undefined {
   return { width: Number.parseFloat(width[1]!), height: Number.parseFloat(height[1]!) }
 }
 
-/** Per-page viewport: the document's own declaration, else its primary image's size. */
-async function resolvePageViewport(archive: ZipArchive, path: string): Promise<Viewport | undefined> {
+type CssPageSize = (path: string, xml: string) => Promise<Viewport | undefined>
+
+/**
+ * The page size a document's CSS declares (layout/css.ts), each stylesheet read and
+ * parsed once however many pages link to it — a converted Kindle book links every
+ * one of its pages to the same 90 KB stylesheet.
+ */
+function cssPageSizes(archive: ZipArchive): CssPageSize {
+  const sheets = new Map<string, Promise<ClassRules>>()
+  const sheet = (path: string): Promise<ClassRules> => {
+    let parsed = sheets.get(path)
+    if (!parsed) {
+      parsed = safeReadText(archive, path).then((css) => parseClassRules(css ?? ''))
+      sheets.set(path, parsed)
+    }
+    return parsed
+  }
+  return async (path, xml) => {
+    const doc = parseXml(xml)
+    const linked = await Promise.all(stylesheetHrefs(doc).map((href) => sheet(resolvePath(dirname(path), href))))
+    return fixedBoxViewport(doc, [...linked, ...inlineStylesheets(doc).map(parseClassRules)])
+  }
+}
+
+/** Per-page viewport: the document's own declaration, then its CSS, else its primary image's size. */
+async function resolvePageViewport(archive: ZipArchive, path: string, sizes: CssPageSize): Promise<Viewport | undefined> {
   const xml = await safeReadText(archive, path)
   if (!xml) return undefined
 
-  const declared = viewportFromDocument(xml)
+  const declared = viewportFromDocument(xml) ?? (await sizes(path, xml))
   if (declared) return declared
 
   const href = primaryImageHref(xml)
