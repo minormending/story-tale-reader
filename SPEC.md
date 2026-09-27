@@ -192,6 +192,14 @@ An EPUB page references its assets with **relative URLs** (`images/page012.jpg`,
    same-origin, so we can inject the highlight class for read-along. Fonts, CSS,
    and audio all just work.
 
+   The worker holds no zip code: it asks the app's window for the bytes over a
+   `MessageChannel` (`src/vfs/ask.ts`, answered by `src/vfs/client.ts`). It asks
+   **top-level windows only**. The book's own page frames are same-origin windows
+   too, but they run no scripts and can never answer. Asking one costs the full
+   15-second timeout, and tapping a page puts its frame first in the client list,
+   so a page turned with a tap would otherwise sit blank for 15 seconds per round
+   of files.
+
 This works on GitHub Pages (HTTPS) and inside Capacitor (the WebView serves the app
 from `https://localhost`, where service workers are available).
 
