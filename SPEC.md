@@ -382,6 +382,15 @@ re-import, delete, layout overrides. Sort by recent/title/author. Import via:
   the reader turns on in Android's settings after the app says why; it is asked for
   only when they choose Downloads, never at install, and only book files are read.
 
+**Groups.** Series are grouped automatically (`src/engine/series.ts`), and the reader
+can group books themselves: **Group** on a book, or **Select** to choose several, then
+pick a group, name a new one, choose "In no group" (the book stays loose whatever its
+title suggests), or "Let the shelf decide". A group of the reader's is stored as a name
+on each book (`LibraryEntry.shelfGroup`) and lasts as long as a book names it; it can be
+renamed or ungrouped from its heading. A group with the same name as a series the shelf
+found is one group, so adding a book the shelf missed to a series means adding it to a
+group of that name. Search matches group names too.
+
 One bundled public-domain sample book ships with the app, so the GitHub Pages URL
 demonstrates fixed-layout rendering to a first-time visitor instead of showing an
 empty shelf. **Sourcing that sample is an open item — see §13.**

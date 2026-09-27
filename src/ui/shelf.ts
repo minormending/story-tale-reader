@@ -40,9 +40,10 @@ function sortKey(value: string): string {
 /**
  * Does this book answer to what was typed?
  *
- * Title, author and series are all searched, because a reader looking for a book
- * may remember any one of the three — and on this shelf the series is often the
- * only name they remember, since picture books in a series share everything else.
+ * Title, author, series and the reader's own group are all searched, because a
+ * reader looking for a book may remember any one of them — and on this shelf the
+ * series is often the only name they remember, since picture books in a series
+ * share everything else.
  *
  * Every word must match something, but not the same something: "potter rabbit"
  * finds a Beatrix Potter book about a rabbit. Matching the whole phrase against one
@@ -52,7 +53,9 @@ export function matchesQuery(entry: LibraryEntry, query: string): boolean {
   const needles = fold(query).split(/\s+/).filter(Boolean)
   if (needles.length === 0) return true
 
-  const haystack = fold([entry.title, entry.creator ?? '', entry.series ?? ''].join(' '))
+  // The reader's own group counts too: they named it, so they may search by it.
+  const group = typeof entry.shelfGroup === 'string' ? entry.shelfGroup : ''
+  const haystack = fold([entry.title, entry.creator ?? '', entry.series ?? '', group].join(' '))
   return needles.every((needle) => haystack.includes(needle))
 }
 

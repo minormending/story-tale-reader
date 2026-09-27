@@ -33,6 +33,12 @@ describe('matchesQuery', () => {
     expect(matchesQuery(peter, 'badger')).toBe(false)
   })
 
+  it('finds a book by the name of the group the reader put it in', () => {
+    const grouped = book({ title: 'Hotel Flamingo', creator: 'Alex Milway', shelfGroup: 'Bedtime' })
+    expect(matchesQuery(grouped, 'bedtime')).toBe(true)
+    expect(matchesQuery(book({ title: 'Hotel Flamingo', shelfGroup: null }), 'null')).toBe(false)
+  })
+
   it('finds a book by its series, which is often the only name remembered', () => {
     const tippie = book({ title: 'Learn to Read 3', series: 'Tippie' })
     expect(matchesQuery(tippie, 'tippie')).toBe(true)

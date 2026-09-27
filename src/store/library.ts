@@ -28,6 +28,7 @@ import {
 import { latestOnly } from './latest'
 import { deleteBookFile, loadBookFile, requestPersistence, saveBookFile } from './files'
 import { removeBookmarksFor } from './bookmarks'
+import { sameGroupName, tidyGroupName } from './groupNames'
 
 export interface LibraryEntry {
   id: string
@@ -53,6 +54,13 @@ export interface LibraryEntry {
    * and a book that simply has no picture is not re-read on every launch.
    */
   coverVersion?: number
+  /**
+   * Where the reader has put this book on the shelf, overriding the automatic
+   * series grouping: a group's name, or `null` for "in no group, whatever the shelf
+   * would guess". Absent means the shelf decides. A group exists only as long as
+   * some book names it, so there is nothing else to store or clean up.
+   */
+  shelfGroup?: string | null
 }
 
 export interface Progress {
@@ -210,10 +218,38 @@ export async function importBook(
     hasMediaOverlays: opened.book.hasMediaOverlays,
     cover: existing?.cover ?? (await makeCover(opened)),
     coverVersion: existing?.cover ? existing.coverVersion : COVER_VERSION,
+    // Re-adding a book keeps it where the reader put it.
+    ...(existing?.shelfGroup !== undefined ? { shelfGroup: existing.shelfGroup } : {}),
   }
   const listed = await saveEntry(entry)
   await rememberMeasurement(id, opened.measurement)
   return { entry, ...opened, persisted: stored && listed }
+}
+
+/**
+ * Put books in a group of the reader's own (a name), in no group at all (`null`),
+ * or back under the shelf's automatic grouping (`undefined`).
+ */
+export async function setShelfGroup(ids: string[], group: string | null | undefined): Promise<void> {
+  const name = typeof group === 'string' ? tidyGroupName(group) : group
+  if (name === '') return
+  for (const id of ids) {
+    const entry = await get<LibraryEntry>(STORE_BOOKS, id)
+    if (!entry) continue
+    const next: LibraryEntry = { ...entry }
+    if (name === undefined) delete next.shelfGroup
+    else next.shelfGroup = name
+    await saveEntry(next)
+  }
+}
+
+/** Rename one of the reader's groups, on every book in it. */
+export async function renameShelfGroup(from: string, to: string): Promise<void> {
+  if (!tidyGroupName(to)) return
+  const members = (await listLibrary()).filter(
+    (entry) => typeof entry.shelfGroup === 'string' && sameGroupName(entry.shelfGroup, from),
+  )
+  await setShelfGroup(members.map((entry) => entry.id), to)
 }
 
 /**
