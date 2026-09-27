@@ -37,7 +37,8 @@ export function Library({
   entries: LibraryEntry[]
   onOpenFile: (file: File) => void
   onOpenEntry: (id: string) => void
-  onDelete: (id: string) => void
+  /** Take books off the shelf, their stored files with them. */
+  onDelete: (ids: string[]) => void
   onImportMany: (sources: BookSource[]) => void
   /** Android only: a real folder chooser, which the browser cannot offer. */
   onPickFolder?: () => void
@@ -53,7 +54,6 @@ export function Library({
   const inputRef = useRef<HTMLInputElement>(null)
   const folderRef = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
-  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   // Asked once: it cannot change while the page is open, and asking per render
   // would mean building a throwaway input on every keystroke in the search box.
@@ -64,6 +64,8 @@ export function Library({
   const [selected, setSelected] = useState<Set<string>>(new Set())
   // The books a group is being chosen for, when the group picker is open.
   const [picking, setPicking] = useState<string[] | null>(null)
+  // Removing the chosen books asks first, in the bar itself.
+  const [confirmingRemove, setConfirmingRemove] = useState(false)
 
   // Groups are worked out from the shelf rather than stored as groups: the reader's
   // own are a name on each book, and series are found afresh, so adding the second
@@ -93,6 +95,14 @@ export function Library({
   const stopSelecting = (): void => {
     setSelecting(false)
     setSelected(new Set())
+    setConfirmingRemove(false)
+  }
+
+  /** A long press on a book: start choosing, with that book chosen. */
+  const startSelectingWith = (id: string): void => {
+    setSelecting(true)
+    setSelected(new Set([id]))
+    setConfirmingRemove(false)
   }
 
   // Android's back button closes the group picker, then leaves choosing books; with
@@ -101,13 +111,14 @@ export function Library({
     () =>
       onBackButton(() => {
         if (picking) setPicking(null)
+        else if (confirmingRemove) setConfirmingRemove(false)
         else if (selecting) {
           setSelecting(false)
           setSelected(new Set())
         } else return false
         return true
       }),
-    [picking, selecting],
+    [picking, selecting, confirmingRemove],
   )
 
   /**
@@ -218,31 +229,38 @@ export function Library({
       {error && <p className="banner banner-error">{error}</p>}
       {notice && <p className="banner banner-warn">{notice}</p>}
 
-      {/* Only worth the room once there is enough on the shelf to lose a book in. */}
-      {entries.length > 4 && (
+      {entries.length > 0 && (
         <div className="shelf-controls">
-          <input
-            className="shelf-search"
-            type="search"
-            value={query}
-            // Named by the attribute rather than by a visually hidden label. The
-            // hidden-label trick is a line of text in a one-pixel box, which is a
-            // container clipping its own content — indistinguishable, to anything
-            // measuring the page, from text a reader was meant to see and cannot.
-            aria-label="Search your books"
-            placeholder="Search by title, author, series or group"
-            onChange={(event) => setQuery(event.target.value)}
-          />
-          <label className="shelf-sort">
-            <span className="muted">Sort</span>
-            <select value={sort} onChange={(event) => setSort(event.target.value as ShelfSort)}>
-              {(Object.keys(SORT_LABELS) as ShelfSort[]).map((option) => (
-                <option key={option} value={option}>
-                  {SORT_LABELS[option]}
-                </option>
-              ))}
-            </select>
-          </label>
+          {/* Search and sort are only worth the room once there is enough on the
+              shelf to lose a book in. */}
+          {entries.length > 4 && (
+            <>
+              <input
+                className="shelf-search"
+                type="search"
+                value={query}
+                // Named by the attribute rather than by a visually hidden label. The
+                // hidden-label trick is a line of text in a one-pixel box, which is a
+                // container clipping its own content — indistinguishable, to anything
+                // measuring the page, from text a reader was meant to see and cannot.
+                aria-label="Search your books"
+                placeholder="Search your books"
+                onChange={(event) => setQuery(event.target.value)}
+              />
+              <label className="shelf-sort">
+                <span className="muted">Sort</span>
+                <select value={sort} onChange={(event) => setSort(event.target.value as ShelfSort)}>
+                  {(Object.keys(SORT_LABELS) as ShelfSort[]).map((option) => (
+                    <option key={option} value={option}>
+                      {SORT_LABELS[option]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </>
+          )}
+          {/* Long-pressing a book does the same, but a long press is invisible:
+              this is how anyone who has not guessed it finds grouping and removing. */}
           <button
             className={`secondary shelf-select${selecting ? ' shelf-select-on' : ''}`}
             aria-pressed={selecting}
@@ -312,13 +330,10 @@ export function Library({
                       key={entry.id}
                       entry={entry}
                       onOpenEntry={onOpenEntry}
-                      onDelete={onDelete}
-                      confirmDelete={confirmDelete}
-                      setConfirmDelete={setConfirmDelete}
                       selecting={selecting}
                       selected={selected.has(entry.id)}
                       onToggle={toggle}
-                      onGroup={(id) => setPicking([id])}
+                      onLongPress={startSelectingWith}
                     />
                   ) : null
                 })}
@@ -335,13 +350,10 @@ export function Library({
                     key={entry.id}
                     entry={entry}
                     onOpenEntry={onOpenEntry}
-                    onDelete={onDelete}
-                    confirmDelete={confirmDelete}
-                    setConfirmDelete={setConfirmDelete}
                     selecting={selecting}
                     selected={selected.has(entry.id)}
                     onToggle={toggle}
-                    onGroup={(id) => setPicking([id])}
+                    onLongPress={startSelectingWith}
                   />
                 ))}
               </ul>
@@ -357,15 +369,44 @@ export function Library({
 
       {selecting && (
         <div className="selection-bar" role="region" aria-label="Chosen books">
-          <span className="selection-count">
-            {selected.size === 0 ? 'Tap books to choose them' : `${selected.size} chosen`}
-          </span>
-          <button className="primary" disabled={selected.size === 0} onClick={() => setPicking([...selected])}>
-            Add to a group
-          </button>
-          <button className="secondary" onClick={stopSelecting}>
-            Done
-          </button>
+          {confirmingRemove ? (
+            <>
+              <span className="selection-count">
+                Remove {selected.size} {selected.size === 1 ? 'book' : 'books'} from this shelf?
+              </span>
+              <button
+                className="secondary selection-danger"
+                onClick={() => {
+                  onDelete([...selected])
+                  stopSelecting()
+                }}
+              >
+                Remove
+              </button>
+              <button className="secondary" onClick={() => setConfirmingRemove(false)}>
+                Keep
+              </button>
+            </>
+          ) : (
+            <>
+              <span className="selection-count">
+                {selected.size === 0 ? 'Tap books to choose them' : `${selected.size} chosen`}
+              </span>
+              <button className="primary" disabled={selected.size === 0} onClick={() => setPicking([...selected])}>
+                Add to a group
+              </button>
+              <button
+                className="secondary selection-danger"
+                disabled={selected.size === 0}
+                onClick={() => setConfirmingRemove(true)}
+              >
+                Remove
+              </button>
+              <button className="secondary" onClick={stopSelecting}>
+                Done
+              </button>
+            </>
+          )}
         </div>
       )}
 
@@ -429,7 +470,7 @@ function Cover({ entry }: { entry: LibraryEntry }) {
       </span>
     )
   }
-  return <img className="shelf-cover" src={url} alt="" loading="lazy" />
+  return <img className="shelf-cover" src={url} alt="" loading="lazy" draggable={false} />
 }
 
 function StorageLine() {
@@ -525,34 +566,75 @@ function Sample({
 }
 
 /** One book on the shelf. Extracted so a grouped shelf and a flat one share it. */
+/** How long a press on a book has to last to start choosing books. Android's own. */
+const LONG_PRESS_MS = 500
+/** A finger that travels further than this is scrolling the shelf, not pressing. */
+const LONG_PRESS_SLOP_PX = 10
+
 function ShelfItem({
   entry,
   onOpenEntry,
-  onDelete,
-  confirmDelete,
-  setConfirmDelete,
   selecting,
   selected,
   onToggle,
-  onGroup,
+  onLongPress,
 }: {
   entry: LibraryEntry
   onOpenEntry: (id: string) => void
-  onDelete: (id: string) => void
-  confirmDelete: string | null
-  setConfirmDelete: (id: string | null) => void
-  /** Choosing books to group: a tap chooses a book instead of opening it. */
+  /** Choosing books: a tap chooses a book instead of opening it. */
   selecting: boolean
   selected: boolean
   onToggle: (id: string) => void
-  onGroup: (id: string) => void
+  /** Held down (or right-clicked): start choosing books, with this one chosen. */
+  onLongPress: (id: string) => void
 }) {
+  const press = useRef<{ timer: number; x: number; y: number } | null>(null)
+  // The click that follows a long press is part of it, not a tap on the book.
+  const swallowClick = useRef(false)
+
+  const cancelPress = (): void => {
+    if (press.current) window.clearTimeout(press.current.timer)
+    press.current = null
+  }
+
   return (
     <li className={`shelf-item${selected ? ' shelf-item-selected' : ''}`}>
       <button
         className="shelf-open"
-        onClick={() => (selecting ? onToggle(entry.id) : onOpenEntry(entry.id))}
         aria-pressed={selecting ? selected : undefined}
+        onClick={() => {
+          if (swallowClick.current) {
+            swallowClick.current = false
+            return
+          }
+          if (selecting) onToggle(entry.id)
+          else onOpenEntry(entry.id)
+        }}
+        onPointerDown={(event) => {
+          if (event.button !== 0) return
+          swallowClick.current = false
+          const timer = window.setTimeout(() => {
+            press.current = null
+            swallowClick.current = true
+            if (selecting) onToggle(entry.id)
+            else onLongPress(entry.id)
+            navigator.vibrate?.(15)
+          }, LONG_PRESS_MS)
+          press.current = { timer, x: event.clientX, y: event.clientY }
+        }}
+        onPointerMove={(event) => {
+          const start = press.current
+          if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) > LONG_PRESS_SLOP_PX) cancelPress()
+        }}
+        onPointerUp={cancelPress}
+        onPointerCancel={cancelPress}
+        onPointerLeave={cancelPress}
+        onContextMenu={(event) => {
+          // A long press on Android, or a right-click: never the browser's own menu
+          // over a cover ("Download image", "Share image").
+          event.preventDefault()
+          if (!press.current && !swallowClick.current && !selecting) onLongPress(entry.id)
+        }}
       >
         <span className="shelf-cover-frame">
           <Cover entry={entry} />
@@ -569,35 +651,6 @@ function ShelfItem({
           {entry.hasMediaOverlays && <span className="badge badge-accent">Read-along</span>}
         </span>
       </button>
-      {selecting ? null : confirmDelete === entry.id ? (
-        <div className="shelf-confirm">
-          <button
-            className="shelf-remove danger"
-            onClick={() => {
-              onDelete(entry.id)
-              setConfirmDelete(null)
-            }}
-          >
-            Remove
-          </button>
-          <button className="shelf-remove" onClick={() => setConfirmDelete(null)}>
-            Keep
-          </button>
-        </div>
-      ) : (
-        <div className="shelf-confirm">
-          <button className="shelf-remove" onClick={() => onGroup(entry.id)} aria-label={`Group ${entry.title}`}>
-            Group
-          </button>
-          <button
-            className="shelf-remove"
-            onClick={() => setConfirmDelete(entry.id)}
-            aria-label={`Remove ${entry.title}`}
-          >
-            Remove
-          </button>
-        </div>
-      )}
     </li>
   )
 }
