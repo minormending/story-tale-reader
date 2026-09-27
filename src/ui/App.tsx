@@ -10,8 +10,8 @@ import { DrmError } from '../engine/epub/ocf'
 import { mountBook, setReading, startVfs, unmountBook } from '../vfs/client'
 import { onBookOpened, takeIncomingBook } from '../native/bookIntent'
 import {
-  deleteBook, getOverrides, getProgress, importBook, listLibrary, openStoredBook, repairCovers,
-  saveOverrides, saveProgress, type LibraryEntry, type OpenedBook,
+  deleteBook, getOverrides, getProgress, importBook, listLibrary, openStoredBook, renameShelfGroup,
+  repairCovers, saveOverrides, saveProgress, setShelfGroup, type LibraryEntry, type OpenedBook,
 } from '../store/library'
 import type { ZipArchive } from '../engine/zip/reader'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
@@ -291,6 +291,27 @@ export function App() {
     }
   }, [importNew])
 
+  /** Put books in one of the reader's groups, in none, or back under the shelf's own grouping. */
+  const groupBooks = useCallback(async (ids: string[], group: string | null | undefined) => {
+    setError(null)
+    try {
+      await setShelfGroup(ids, group)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause))
+    }
+    setEntries(await listLibrary())
+  }, [])
+
+  const renameGroup = useCallback(async (from: string, to: string) => {
+    setError(null)
+    try {
+      await renameShelfGroup(from, to)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause))
+    }
+    setEntries(await listLibrary())
+  }, [])
+
   const openEntry = useCallback(
     async (id: string) => {
       setError(null)
@@ -404,6 +425,8 @@ export function App() {
       onImportMany={(sources) => void importMany(sources)}
       onPickFolder={canPickFolderNatively() ? () => void importFolder() : undefined}
       onAddFromDownloads={downloadsOffered ? () => void importDownloads() : undefined}
+      onSetGroup={(ids, group) => void groupBooks(ids, group)}
+      onRenameGroup={(from, to) => void renameGroup(from, to)}
       onOpenEntry={(id) => void openEntry(id)}
       onDelete={(id) => void remove(id)}
       busy={busy}
