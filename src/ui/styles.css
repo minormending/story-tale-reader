@@ -448,7 +448,13 @@ button { font: inherit; cursor: pointer; }
   color: inherit;
   text-align: left;
   min-width: 0;
+  /* A long press chooses the book: not the browser's text selection, its image
+     menu, or a drag of the cover. */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
+.shelf-open img { -webkit-user-drag: none; }
 
 .shelf-cover {
   width: 100%;
@@ -512,7 +518,6 @@ button { font: inherit; cursor: pointer; }
 }
 .badge-accent { background: var(--badge-accent-bg); color: var(--badge-accent-fg); }
 
-.shelf-confirm { display: flex; gap: 0.35rem; }
 .shelf-remove {
   background: transparent;
   color: var(--fg-muted);
@@ -880,6 +885,8 @@ button { font: inherit; cursor: pointer; }
 
 /* ------------------------------------------------------- choosing books --- */
 
+/* At the row's end: beside search and sort on a full shelf, on its own at the right on a small one. */
+.shelf-select { margin-left: auto; }
 .shelf-select-on { background: var(--hover-strong); border-color: var(--fg-muted); }
 
 /* The cover and, while choosing, a tick over its corner. */
@@ -926,6 +933,9 @@ button { font: inherit; cursor: pointer; }
 .selection-bar .primary { margin-top: 0; }
 .selection-bar .primary:disabled { opacity: 0.45; cursor: default; }
 .selection-count { flex: 1 1 auto; font-weight: 600; }
+.selection-danger { color: var(--danger); }
+.selection-danger:not(:disabled):hover { border-color: var(--danger); }
+.selection-bar .secondary:disabled { opacity: 0.45; }
 
 /* ------------------------------------------------------ choosing a group --- */
 

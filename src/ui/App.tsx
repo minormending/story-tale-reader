@@ -374,8 +374,8 @@ export function App() {
     [session],
   )
 
-  const remove = useCallback(async (id: string) => {
-    await deleteBook(id)
+  const remove = useCallback(async (ids: string[]) => {
+    for (const id of ids) await deleteBook(id)
     setEntries(await listLibrary())
   }, [])
 
@@ -430,7 +430,7 @@ export function App() {
       onSetGroup={(ids, group) => void groupBooks(ids, group)}
       onRenameGroup={(from, to) => void renameGroup(from, to)}
       onOpenEntry={(id) => void openEntry(id)}
-      onDelete={(id) => void remove(id)}
+      onDelete={(ids) => void remove(ids)}
       busy={busy}
       error={error}
       notice={notice}
