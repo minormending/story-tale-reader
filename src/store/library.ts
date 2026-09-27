@@ -329,7 +329,14 @@ export async function openStoredBook(id: string, onProgress?: ProgressReporter):
   }
 
   const opened = await parse(blob, entry.fileName, onProgress, { cached: await recallMeasurement(id) })
-  const touched: LibraryEntry = { ...entry, lastOpenedAt: Date.now() }
+  // What the book turned out to be this time, which a better reading of it can change
+  // (a Kindle conversion first filed as reflowable, say), so the shelf says so too.
+  const touched: LibraryEntry = {
+    ...entry,
+    lastOpenedAt: Date.now(),
+    layout: opened.book.layout,
+    pageCount: opened.book.pages.length,
+  }
   await saveEntry(touched)
   await rememberMeasurement(id, opened.measurement)
   return { entry: touched, ...opened, persisted: true }

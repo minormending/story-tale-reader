@@ -37,6 +37,14 @@ export interface SideAssignment {
 /** A page ~1.5x the book's usual width is a pre-composed spread and stands alone. */
 const WIDE_PAGE_RATIO = 1.5
 
+/**
+ * A page this much wider than it is tall stands alone too. Not simply "wider than
+ * tall": some picture books are printed near-square (752 by 732, say) and their
+ * facing pages are a real spread. A landscape format — 10 by 8 inches is 1.25 — or
+ * a whole spread stored as one page (Kindle conversions, near 1.5) clears it.
+ */
+const LANDSCAPE_PAGE_RATIO = 1.2
+
 /** Below this share of numerically-labelled pages, the page-list is not trustworthy. */
 const PAGE_LIST_COVERAGE = 0.5
 
@@ -74,8 +82,16 @@ export function assignSpreadSides(
   const everyPageExplicit = explicit.every((side) => side !== undefined)
 
   // Rule 3 applies regardless of how sides are derived: a double-width page is a
-  // pre-composed spread and can never share the frame.
-  const wide = pages.map((page) => page.viewport.width >= modal.width * WIDE_PAGE_RATIO)
+  // pre-composed spread and can never share the frame. Neither can a page clearly
+  // wider than it is tall. That is what a pre-composed spread looks like when every
+  // page of the book is one — a book converted from Kindle fixed layout stores each
+  // spread as a single landscape page, so none is wider than the others — and a
+  // landscape page beside another is two small pictures rather than one large one.
+  const wide = pages.map(
+    (page) =>
+      page.viewport.width >= modal.width * WIDE_PAGE_RATIO ||
+      page.viewport.width >= page.viewport.height * LANDSCAPE_PAGE_RATIO,
+  )
 
   let source: SideSource
 
