@@ -28,6 +28,7 @@ import { InlinePageResolver } from '../vfs/inline'
 import { isVfsReady } from '../vfs/client'
 import type { ZipArchive } from '../engine/zip/reader'
 import type { BookPage, Direction, LayoutOverrides, ParsedBook, Spread } from '../engine/types'
+import { onBackButton } from '../native/backButton'
 
 export interface ViewerProps {
   bookId: string
@@ -246,6 +247,19 @@ export function Viewer({
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onKey])
+
+  // Android's back button, one level at a time like Escape: the menu first, then
+  // the book. Locked, it is taken and ignored — a child holding the tablet should
+  // not be one press away from the library.
+  useEffect(
+    () =>
+      onBackButton(() => {
+        if (menuOpen) setMenuOpen(false)
+        else if (!locked) onClose()
+        return true
+      }),
+    [menuOpen, locked, onClose],
+  )
 
   useEffect(() => {
     const previous = document.title

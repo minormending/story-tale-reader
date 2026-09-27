@@ -150,6 +150,8 @@ export async function renderPdfPage(
   canvas: HTMLCanvasElement | OffscreenCanvas,
   cssScale: number,
   devicePixelRatio: number,
+  /** Stops the render: a page turned past, or redrawn at a new size, need not finish. */
+  signal?: AbortSignal,
 ): Promise<void> {
   const page = await document.getPage(pageNumber)
   const viewport = page.getViewport({ scale: cssScale * devicePixelRatio })
@@ -164,5 +166,12 @@ export async function renderPdfPage(
   const context = canvas.getContext('2d') as CanvasRenderingContext2D | null
   if (!context) throw new PdfError('This device could not provide a drawing surface')
   // pdf.js types its canvas as a DOM one; it only ever draws through the context.
-  await page.render({ canvas: canvas as HTMLCanvasElement, canvasContext: context, viewport }).promise
+  const task = page.render({ canvas: canvas as HTMLCanvasElement, canvasContext: context, viewport })
+  const stop = (): void => task.cancel()
+  signal?.addEventListener('abort', stop, { once: true })
+  try {
+    await task.promise
+  } finally {
+    signal?.removeEventListener('abort', stop)
+  }
 }

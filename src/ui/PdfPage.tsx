@@ -17,18 +17,30 @@ export function PdfPage({
   scale: number
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  // The last render into this canvas. pdf.js refuses a second render into a canvas
+  // while one is still going, and cancelling takes effect asynchronously, so a redraw
+  // at a new size waits for the old one to have stopped.
+  const previous = useRef<Promise<unknown>>(Promise.resolve())
 
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas || scale <= 0) return
 
-    let cancelled = false
+    const controller = new AbortController()
     const ratio = Math.min(window.devicePixelRatio || 1, 3)
-    void renderPdfPage(pdf, page.index + 1, canvas, scale, ratio).catch(() => {
-      if (!cancelled) canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height)
-    })
+    const drawn = previous.current
+      .then(() => (controller.signal.aborted ? undefined : renderPdfPage(pdf, page.index + 1, canvas, scale, ratio, controller.signal)))
+      .catch(() => {
+        if (!controller.signal.aborted) canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height)
+      })
+    previous.current = drawn
     return () => {
-      cancelled = true
+      // A scanned page takes seconds to draw on a cheap tablet, and turning past it
+      // used to leave that work running and its decoded images held: stop the
+      // render, then let pdf.js release the page once it has stopped. (cleanup is
+      // a no-op while a newer render of the same page is still under way.)
+      controller.abort()
+      void drawn.finally(() => pdf.getPage(page.index + 1).then((proxy) => proxy.cleanup()).catch(() => undefined))
     }
   }, [pdf, page.index, scale])
 
