@@ -7,6 +7,7 @@
  */
 import { precacheAndRoute, cleanupOutdatedCaches } from 'workbox-precaching'
 import { VFS_SEGMENT, type BookFetchResponse } from './vfs/protocol'
+import { askForBookFile } from './vfs/ask'
 
 declare const self: ServiceWorkerGlobalScope & {
   __WB_MANIFEST: Array<{ url: string; revision: string | null }>
@@ -25,7 +26,6 @@ self.addEventListener('activate', (event) => {
 
 const BASE = new URL(self.registration.scope).pathname
 const PREFIX = `${BASE}${VFS_SEGMENT}/`
-const REQUEST_TIMEOUT_MS = 15_000
 
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url)
@@ -49,7 +49,8 @@ async function serveBookFile(pathname: string, request: Request): Promise<Respon
 
   let reply: BookFetchResponse
   try {
-    reply = await askClient(bookId, path)
+    const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+    reply = await askForBookFile(clients, bookId, path)
   } catch (error) {
     return new Response(`Book file unavailable: ${String(error)}`, { status: 504 })
   }
@@ -79,37 +80,4 @@ async function serveBookFile(pathname: string, request: Request): Promise<Respon
 
   headers.set('Content-Length', String(total))
   return new Response(reply.bytes, { status: 200, headers })
-}
-
-async function askClient(bookId: string, path: string): Promise<BookFetchResponse> {
-  const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
-  if (clients.length === 0) throw new Error('no window client is holding this book')
-
-  // Try each client: the one that opened the book may not be the first listed.
-  let lastError = 'no client could serve the file'
-  for (const client of clients) {
-    try {
-      return await requestFrom(client, bookId, path)
-    } catch (error) {
-      lastError = String(error)
-    }
-  }
-  throw new Error(lastError)
-}
-
-function requestFrom(client: Client, bookId: string, path: string): Promise<BookFetchResponse> {
-  return new Promise((resolve, reject) => {
-    const channel = new MessageChannel()
-    const timer = setTimeout(() => {
-      channel.port1.close()
-      reject(new Error('timed out'))
-    }, REQUEST_TIMEOUT_MS)
-
-    channel.port1.onmessage = (event: MessageEvent<BookFetchResponse>) => {
-      clearTimeout(timer)
-      channel.port1.close()
-      resolve(event.data)
-    }
-    client.postMessage({ type: 'vfs:read', bookId, path }, [channel.port2])
-  })
 }
