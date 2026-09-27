@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { SpreadView, fitScale, spreadContentSize } from './SpreadView'
 import { useFrameSize } from './useFrameSize'
-import { applySpreadShift, buildSpreads, shouldPair } from '../engine/layout/spread'
+import { applySpreadShift, buildSpreads, shouldPair, spreadIndexOfPage } from '../engine/layout/spread'
 import { modalViewport, DEFAULT_VIEWPORT } from '../engine/layout/viewport'
 import { PageFrame } from './PageFrame'
 import { PdfPage } from './PdfPage'
@@ -13,6 +13,9 @@ import { useChromeAutoHide } from './useChromeAutoHide'
 import { LockButton } from './LockButton'
 import { BookmarkToggle, BookmarksSection } from './Bookmarks'
 import { ContentsSection } from './Contents'
+import { PageScrubber } from './PageScrubber'
+import { chapterAt, chapterMarks } from './chapters'
+import { createPageThumbnails } from '../reader/thumbnails'
 import { ReadingSupportSection } from './ReadingSupport'
 import { WordListSection } from './WordList'
 import { clearWords, loadWords, recordTap } from '../store/words'
@@ -65,6 +68,10 @@ export function Viewer({
   const [stageRef, frame] = useFrameSize<HTMLDivElement>()
   const [chromeVisible, setChromeVisible] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
+  // Chapters and bookmarks, one tap from the top bar rather than inside a menu.
+  const [contentsOpen, setContentsOpen] = useState(false)
+  // The page scrubber is held: the bar it is in must not hide under the finger.
+  const [scrubbing, setScrubbing] = useState(false)
   const [locked, setLocked] = useState(false)
 
   /**
@@ -80,7 +87,11 @@ export function Viewer({
   useWakeLock(true)
 
   // The bars are drawn over the page; let them retire so it can be seen whole.
-  useChromeAutoHide(chromeVisible, () => setChromeVisible(false), menuOpen || waitingForReader)
+  useChromeAutoHide(
+    chromeVisible,
+    () => setChromeVisible(false),
+    menuOpen || contentsOpen || waitingForReader || scrubbing,
+  )
 
   const modal = useMemo(
     () => modalViewport(book.pages.map((page) => page.viewport)) ?? DEFAULT_VIEWPORT,
@@ -235,12 +246,13 @@ export function Viewer({
       else if (event.key === 'PageUp') turn(-1)
       else if (event.key === 'Escape') {
         // Back out one level at a time rather than leaving the book from the menu.
-        if (menuOpen) setMenuOpen(false)
+        if (contentsOpen) setContentsOpen(false)
+        else if (menuOpen) setMenuOpen(false)
         // Lock mode takes away every way out of the book, keyboard included.
         else if (!locked) onClose()
       }
     },
-    [turn, rightStep, onClose, menuOpen, locked],
+    [turn, rightStep, onClose, menuOpen, contentsOpen, locked],
   )
 
   useEffect(() => {
@@ -254,11 +266,12 @@ export function Viewer({
   useEffect(
     () =>
       onBackButton(() => {
-        if (menuOpen) setMenuOpen(false)
+        if (contentsOpen) setContentsOpen(false)
+        else if (menuOpen) setMenuOpen(false)
         else if (!locked) onClose()
         return true
       }),
-    [menuOpen, locked, onClose],
+    [contentsOpen, menuOpen, locked, onClose],
   )
 
   useEffect(() => {
@@ -290,6 +303,50 @@ export function Viewer({
   const handlePageGone = useCallback(
     (pageIndex: number, doc: Document) => readAlong.onPageGone(pageIndex, doc),
     [readAlong],
+  )
+
+  /* ---------------------------- finding a place ---------------------------- */
+
+  // Where each contents entry begins, as spreads: the scrubber's ticks and labels.
+  const marks = useMemo(
+    () =>
+      chapterMarks(book.nav, (path) => {
+        const page = book.pages.findIndex((candidate) => candidate.path === path)
+        return page < 0 ? -1 : spreadIndexOfPage(spreads, page)
+      }),
+    [book.nav, book.pages, spreads],
+  )
+
+  const positionLabel = useCallback(
+    (position: number): string => {
+      const where = describePosition(spreads[position], book.direction) || `${position + 1} of ${spreads.length}`
+      const chapter = chapterAt(marks, position)
+      return chapter ? `${where} \u00b7 ${chapter}` : where
+    },
+    [spreads, book.direction, marks],
+  )
+
+  // Pictures for the scrubber's bubble. EPUB only: a PDF page would have to be
+  // rendered, and a scanned one takes seconds to render on the tablet.
+  const thumbnails = useMemo(() => (archive ? createPageThumbnails(archive) : null), [archive])
+  useEffect(() => () => thumbnails?.dispose(), [thumbnails])
+  const preview = useMemo(
+    () =>
+      thumbnails
+        ? (position: number) => {
+            const page = leadPage(spreads[position], book.direction)
+            return page ? thumbnails.get(page) : Promise.resolve(undefined)
+          }
+        : undefined,
+    [thumbnails, spreads, book.direction],
+  )
+
+  const goToSpread = useCallback(
+    (position: number) => {
+      const first = leadPage(spreads[position], book.direction)
+      if (first) setPageIndex(first.index)
+    },
+    [spreads, book.direction],
   )
 
   /* ------------------------------ bookmarks ------------------------------ */
@@ -424,9 +481,24 @@ export function Viewer({
                 bookmarked={bookmarkHere !== undefined}
                 onToggle={() => void toggleBookmark()}
               />
+              {(book.nav.length > 0 || bookmarks.length > 0) && (
+                <button
+                  className="icon-button"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    setContentsOpen((open) => !open)
+                  }}
+                  aria-expanded={contentsOpen}
+                >
+                  Contents
+                </button>
+              )}
               <button
                 className="icon-button"
-                onClick={() => setMenuOpen((open) => !open)}
+                onClick={() => {
+                  setContentsOpen(false)
+                  setMenuOpen((open) => !open)
+                }}
                 aria-expanded={menuOpen}
               >
                 Fix layout
@@ -437,6 +509,7 @@ export function Viewer({
             locked={locked}
             onLock={() => {
               setMenuOpen(false)
+              setContentsOpen(false)
               setLocked(true)
             }}
             onUnlock={() => setLocked(false)}
@@ -444,8 +517,8 @@ export function Viewer({
         </div>
       </header>
 
-      {menuOpen && (
-        <div className="menu" role="group" aria-label="Reading options">
+      {contentsOpen && !locked && (
+        <div className="menu contents-panel" role="group" aria-label="Contents and bookmarks">
           <ContentsSection
             items={book.nav}
             currentPaths={[spread?.center?.path, spread?.left?.path, spread?.right?.path].filter(
@@ -457,17 +530,22 @@ export function Viewer({
               const target = book.pages.findIndex((candidate) => candidate.path === item.path)
               if (target === -1) return
               setPageIndex(target)
-              setMenuOpen(false)
+              setContentsOpen(false)
             }}
           />
           <BookmarksSection
             bookmarks={bookmarks}
             onJump={(bookmark) => {
               setPageIndex(bookmark.pageIndex)
-              setMenuOpen(false)
+              setContentsOpen(false)
             }}
             onRemove={(bookmark) => void removeAt(bookmark)}
           />
+        </div>
+      )}
+
+      {menuOpen && (
+        <div className="menu" role="group" aria-label="Reading options">
           <p className="menu-note">
             {book.layout === 'pre-paginated' ? 'Fixed layout' : 'Reflowable'}
             {book.layoutInferred ? ' (detected)' : ''} · pairing from{' '}
@@ -586,8 +664,7 @@ export function Viewer({
                 {readAlong.playing ? '\u23f8' : '\u25b6'}
               </button>
               {/* Repetition is how a young child uses a picture book: the same page,
-                  several times. Without this it means dragging a scrubber that does
-                  not exist. */}
+                  several times. Without this it means turning back and forward again. */}
               <button
                 className="replay"
                 onClick={readAlong.replay}
@@ -603,9 +680,20 @@ export function Viewer({
               {zoom.toFixed(1)}&times; &middot; reset
             </button>
           ) : (
-            <span className="muted">
-              {spreadIndex + 1} / {spreads.length}
-            </span>
+            <>
+              <PageScrubber
+                count={spreads.length}
+                position={spreadIndex}
+                label={positionLabel}
+                marks={marks}
+                preview={preview}
+                onCommit={goToSpread}
+                onScrubbing={setScrubbing}
+              />
+              <span className="muted scrubber-count">
+                {spreadIndex + 1} / {spreads.length}
+              </span>
+            </>
           )}
         </div>
         <button
