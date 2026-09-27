@@ -407,7 +407,19 @@ empty shelf. **Sourcing that sample is an open item — see §13.**
   focus on the button it pressed and guarding on that pinned the bars up for the rest
   of the book. When the bars do retire with focus still on one of their buttons, that
   focus is dropped rather than left on a control the reader cannot see.
-- The book's own table of contents, in the reader's menu. **Built**, and an
+- **Page scrubber** in the bottom bar, and a **Contents** button in the top one.
+  **Built.** Dragging the scrubber moves a bubble over the thumb saying where letting
+  go would land — "Pages 12–13 · Chapter 3" — with a picture of that page for an EPUB
+  picture book (its main illustration, shrunk once and kept; a PDF page would have
+  to be rendered, which for a scanned page takes seconds on the tablet). The book
+  moves only on release, so a drag across a hundred pages is one render, not a
+  hundred. Chapter starts are ticks on the track. Fixed-layout books scrub by spread;
+  reflowable ones by section, with the screen count within the section beside it.
+  The bars do not hide while the thumb is held. The scrubber is hidden when the book
+  is locked: a child turns pages, and one slip of a scrubber loses the place.
+  Contents opens the chapters and bookmarks directly; they used to be inside the
+  "Fix layout" and "Text" menus, which is not where anyone looks for a chapter.
+- The book's own table of contents, in its Contents panel. **Built**, and an
   omission from this spec rather than something deferred: until it existed the only
   way through a long book was Next, one screen at a time, plus whatever the reader
   had bookmarked. Every format reaches it the same way — EPUB parses its nav

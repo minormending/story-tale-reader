@@ -8,6 +8,8 @@ import { useChromeAutoHide } from './useChromeAutoHide'
 import { LockButton } from './LockButton'
 import { BookmarkToggle, BookmarksSection } from './Bookmarks'
 import { ContentsSection } from './Contents'
+import { PageScrubber } from './PageScrubber'
+import { chapterAt, chapterMarks } from './chapters'
 import { ReadingSupportSection } from './ReadingSupport'
 import { announceScreen } from '../reader/announce'
 import type { ReaderSettings } from '../store/settings'
@@ -53,12 +55,16 @@ export function ReflowableViewer({
   const [stageRef, frame] = useFrameSize<HTMLDivElement>()
   const [chromeVisible, setChromeVisible] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
+  // Chapters and bookmarks, one tap from the top bar rather than inside the Text menu.
+  const [contentsOpen, setContentsOpen] = useState(false)
+  // The section scrubber is held: the bar it is in must not hide under the finger.
+  const [scrubbing, setScrubbing] = useState(false)
   const [locked, setLocked] = useState(false)
 
   useWakeLock(true)
 
   // The bars are drawn over the page; let them retire so it can be read whole.
-  useChromeAutoHide(chromeVisible, () => setChromeVisible(false), menuOpen)
+  useChromeAutoHide(chromeVisible, () => setChromeVisible(false), menuOpen || contentsOpen || scrubbing)
 
   /*
    * Owned by App, not here.
@@ -207,11 +213,12 @@ export function ReflowableViewer({
       else if (event.key === 'PageDown' || event.key === ' ') turn(1)
       else if (event.key === 'PageUp') turn(-1)
       else if (event.key === 'Escape') {
-        if (menuOpen) setMenuOpen(false)
+        if (contentsOpen) setContentsOpen(false)
+        else if (menuOpen) setMenuOpen(false)
         else if (!locked) onClose()
       }
     },
-    [turn, rightStep, onClose, menuOpen, locked],
+    [turn, rightStep, onClose, menuOpen, contentsOpen, locked],
   )
 
   useEffect(() => {
@@ -225,11 +232,12 @@ export function ReflowableViewer({
   useEffect(
     () =>
       onBackButton(() => {
-        if (menuOpen) setMenuOpen(false)
+        if (contentsOpen) setContentsOpen(false)
+        else if (menuOpen) setMenuOpen(false)
         else if (!locked) onClose()
         return true
       }),
-    [menuOpen, locked, onClose],
+    [contentsOpen, menuOpen, locked, onClose],
   )
 
   useEffect(() => {
@@ -324,6 +332,7 @@ export function ReflowableViewer({
   const jumpTo = useCallback(
     (bookmark: Bookmark) => {
       setMenuOpen(false)
+      setContentsOpen(false)
       const target = sections.findIndex((page) => page.index === bookmark.pageIndex)
       if (target === -1 || bookmark.anchor === undefined) return
 
@@ -351,6 +360,7 @@ export function ReflowableViewer({
   const jumpToNav = useCallback(
     (item: NavItem) => {
       setMenuOpen(false)
+      setContentsOpen(false)
       const target = sections.findIndex((page) => page.path === item.path)
       if (target === -1) return
 
@@ -366,6 +376,33 @@ export function ReflowableViewer({
       setSectionIndex(target)
     },
     [sections, sectionIndex, frame.width, screenCount],
+  )
+
+  /* ---------------------------- finding a place ---------------------------- */
+
+  // Where each contents entry begins, as sections: the scrubber's ticks and labels.
+  const marks = useMemo(
+    () => chapterMarks(book.nav, (path) => sections.findIndex((page) => page.path === path)),
+    [book.nav, sections],
+  )
+
+  const positionLabel = useCallback(
+    (position: number): string => {
+      const chapter = chapterAt(marks, position)
+      const where = `Section ${position + 1} of ${sections.length}`
+      return chapter ? `${chapter} \u00b7 ${where}` : where
+    },
+    [marks, sections.length],
+  )
+
+  /** A section from the scrubber, from its start. */
+  const goToSection = useCallback(
+    (position: number) => {
+      if (position === sectionIndex || position < 0 || position >= sections.length) return
+      pendingFragment.current = ''
+      setSectionIndex(position)
+    },
+    [sectionIndex, sections.length],
   )
 
   const set = <K extends keyof Typography>(key: K, value: Typography[K]): void =>
@@ -416,9 +453,24 @@ export function ReflowableViewer({
                 bookmarked={bookmarkHere !== undefined}
                 onToggle={() => void toggleBookmark()}
               />
+              {(book.nav.length > 0 || bookmarks.length > 0) && (
+                <button
+                  className="icon-button"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    setContentsOpen((open) => !open)
+                  }}
+                  aria-expanded={contentsOpen}
+                >
+                  Contents
+                </button>
+              )}
               <button
                 className="icon-button"
-                onClick={() => setMenuOpen((open) => !open)}
+                onClick={() => {
+                  setContentsOpen(false)
+                  setMenuOpen((open) => !open)
+                }}
                 aria-expanded={menuOpen}
               >
                 Text
@@ -429,6 +481,7 @@ export function ReflowableViewer({
             locked={locked}
             onLock={() => {
               setMenuOpen(false)
+              setContentsOpen(false)
               setLocked(true)
             }}
             onUnlock={() => setLocked(false)}
@@ -436,14 +489,19 @@ export function ReflowableViewer({
         </div>
       </header>
 
-      {menuOpen && (
-        <div className="menu" role="group" aria-label="Reading options">
+      {contentsOpen && !locked && (
+        <div className="menu contents-panel" role="group" aria-label="Contents and bookmarks">
           <ContentsSection items={book.nav} currentPaths={section ? [section.path] : []} onJump={jumpToNav} />
           <BookmarksSection
             bookmarks={bookmarks}
             onJump={jumpTo}
             onRemove={(bookmark) => void removeBookmark(bookmark.id).then(refresh)}
           />
+        </div>
+      )}
+
+      {menuOpen && (
+        <div className="menu" role="group" aria-label="Reading options">
           <p className="menu-note">Text size</p>
           <div className="menu-row">
             <button className="chip" onClick={() => set('fontScale', Math.max(0.8, typography.fontScale - 0.15))}>
@@ -532,9 +590,19 @@ export function ReflowableViewer({
         >
           Previous
         </button>
-        <span className="muted">
-          {Math.max(screen, 0) + 1} / {screenCount}
-        </span>
+        <div className="chrome-centre">
+          <PageScrubber
+            count={sections.length}
+            position={sectionIndex}
+            label={positionLabel}
+            marks={marks}
+            onCommit={goToSection}
+            onScrubbing={setScrubbing}
+          />
+          <span className="muted scrubber-count">
+            {Math.max(screen, 0) + 1} / {screenCount}
+          </span>
+        </div>
         <button
           className="icon-button"
           onClick={() => turn(1)}
