@@ -88,6 +88,8 @@ export function usePageGestures(actions: GestureActions) {
 
   /** Every pointer currently down, in parent-frame coordinates. */
   const pointers = useRef(new Map<number, Point>()).current
+  /** The document each pointer came down in, so a page that goes takes its pointers with it. */
+  const origins = useRef(new Map<number, Document>()).current
   const gestureStart = useRef<{ point: Point; pointerId: number } | null>(null)
   /** True once a gesture has become something other than a tap or swipe. */
   const consumed = useRef(false)
@@ -126,9 +128,47 @@ export function usePageGestures(actions: GestureActions) {
 
   const isZoomed = (): boolean => current.current.zoom > MIN_ZOOM + ZOOM_EPSILON
 
+  /*
+   * Forget pointers whose lifting nobody will hear.
+   *
+   * A pointer is tracked from its pointerdown until its pointerup — and a pointerup
+   * is delivered to the document the pointer went down in. A thumb resting on the
+   * page while the other hand presses Next is down in a page that is then replaced;
+   * its pointerup goes to a document that no longer exists, and the pointer stayed
+   * "down" for good. Every later tap then looked like a second finger, the start of
+   * a pinch, so no tap or swipe ever registered again: the controls, once hidden,
+   * could not be brought back, and the only way out of the book was to quit the app.
+   */
+  const forgetPointersFrom = useCallback(
+    (doc: Document) => {
+      for (const [id, origin] of origins) {
+        if (origin !== doc) continue
+        origins.delete(id)
+        pointers.delete(id)
+      }
+      if (pointers.size < 2) pinch.current = null
+      if (pointers.size === 0) {
+        gestureStart.current = null
+        panFrom.current = null
+        consumed.current = false
+      }
+    },
+    [origins, pointers],
+  )
+
   const begin = useCallback((event: PointerEvent) => {
+    // A primary pointer is, by definition, the only one down: whatever is still
+    // tracked is left over from a lifting that was never delivered.
+    if (event.isPrimary && pointers.size > 0) {
+      pointers.clear()
+      origins.clear()
+      pinch.current = null
+      panFrom.current = null
+    }
     const point = toParentPoint(event)
     pointers.set(event.pointerId, point)
+    const origin = (event.target as Node | null)?.ownerDocument ?? (event.target instanceof Document ? event.target : null)
+    if (origin) origins.set(event.pointerId, origin)
 
     if (pointers.size === 1) {
       gestureStart.current = { point, pointerId: event.pointerId }
@@ -149,7 +189,7 @@ export function usePageGestures(actions: GestureActions) {
       consumed.current = true
       panFrom.current = null
     }
-  }, [pointers])
+  }, [origins, pointers])
 
   const move = useCallback(
     (event: PointerEvent) => {
@@ -191,6 +231,7 @@ export function usePageGestures(actions: GestureActions) {
     (event: PointerEvent) => {
       const to = pointers.get(event.pointerId) ?? toParentPoint(event)
       pointers.delete(event.pointerId)
+      origins.delete(event.pointerId)
 
       if (pointers.size < 2) pinch.current = null
       if (pointers.size === 0) panFrom.current = null
@@ -238,12 +279,13 @@ export function usePageGestures(actions: GestureActions) {
       else if (position > 0.7) latest.current.onTurn(1)
       else latest.current.onToggleChrome()
     },
-    [pointers, resetZoom],
+    [origins, pointers, resetZoom],
   )
 
   const cancel = useCallback(
     (event: PointerEvent) => {
       pointers.delete(event.pointerId)
+      origins.delete(event.pointerId)
       if (pointers.size < 2) pinch.current = null
       if (pointers.size === 0) {
         gestureStart.current = null
@@ -251,7 +293,7 @@ export function usePageGestures(actions: GestureActions) {
         consumed.current = false
       }
     },
-    [pointers],
+    [origins, pointers],
   )
 
   /**
@@ -284,8 +326,10 @@ export function usePageGestures(actions: GestureActions) {
       // drag-and-drop. That fires pointercancel instead of pointerup, so every
       // swipe across the artwork — the natural place to swipe — was swallowed.
       doc.addEventListener('dragstart', preventDrag)
+      // When the page leaves (a turn replaces its frame), so do its pointers.
+      doc.defaultView?.addEventListener('pagehide', () => forgetPointersFrom(doc))
     },
-    [attached, begin, move, end, cancel, wheel],
+    [attached, begin, move, end, cancel, wheel, forgetPointersFrom],
   )
 
   return {

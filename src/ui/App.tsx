@@ -9,6 +9,7 @@ import { ReflowableViewer } from './ReflowableViewer'
 import { DrmError } from '../engine/epub/ocf'
 import { mountBook, setReading, startVfs, unmountBook } from '../vfs/client'
 import { onBookOpened, takeIncomingBook } from '../native/bookIntent'
+import { startBackButton } from '../native/backButton'
 import {
   deleteBook, getOverrides, getProgress, importBook, listLibrary, openStoredBook, renameShelfGroup,
   repairCovers, saveOverrides, saveProgress, setShelfGroup, type LibraryEntry, type OpenedBook,
@@ -75,6 +76,7 @@ export function App() {
   }, [])
 
   useEffect(() => {
+    startBackButton()
     // Best effort: without it, pages are inlined instead of served (SPEC.md §9.3).
     void startVfs()
     void listLibrary().then(setEntries)

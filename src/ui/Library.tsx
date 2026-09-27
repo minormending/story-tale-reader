@@ -3,6 +3,7 @@ import { BuildTag } from './BuildTag'
 import { canPickDirectory, filesFromDrop, isBookFile } from './pickFiles'
 import type { BookSource } from '../native/folderPicker'
 import { arrangeShelf, groupChoices } from './shelfGroups'
+import { onBackButton } from '../native/backButton'
 import { SORT_LABELS, matchesQuery, sortShelf, type ShelfSort } from './shelf'
 import type { LibraryEntry } from '../store/library'
 import { storageEstimate } from '../store/files'
@@ -93,6 +94,21 @@ export function Library({
     setSelecting(false)
     setSelected(new Set())
   }
+
+  // Android's back button closes the group picker, then leaves choosing books; with
+  // neither open it falls through, and the app goes to the background.
+  useEffect(
+    () =>
+      onBackButton(() => {
+        if (picking) setPicking(null)
+        else if (selecting) {
+          setSelecting(false)
+          setSelected(new Set())
+        } else return false
+        return true
+      }),
+    [picking, selecting],
+  )
 
   /**
    * One book opens; several are added to the shelf.
