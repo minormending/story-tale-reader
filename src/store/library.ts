@@ -28,6 +28,7 @@ import {
 import { latestOnly } from './latest'
 import { deleteBookFile, loadBookFile, requestPersistence, saveBookFile } from './files'
 import { removeBookmarksFor } from './bookmarks'
+import { recallMeasurement, rememberMeasurement } from './measurements'
 import { sameGroupName, tidyGroupName } from './groupNames'
 
 export interface LibraryEntry {
@@ -148,32 +149,6 @@ async function parse(
 
 function stripExtension(name: string): string {
   return name.replace(/\.[^.]+$/, '') || 'Untitled'
-}
-
-/**
- * Keep what a book measured, so the next open does not measure it again.
- *
- * Best effort in both directions: a shelf that cannot write its cache is slower, not
- * broken, and a cache that fails to read is simply a measurement that happens again.
- */
-async function rememberMeasurement(id: string, measurement?: LayoutMeasurement): Promise<void> {
-  // A partial measurement means an override stood in for the real page sizes, and
-  // caching that would answer a question nobody asked.
-  if (!measurement || measurement.viewports.length !== measurement.pageCount) return
-  try {
-    await put(STORE_LAYOUT, { id, ...measurement })
-  } catch {
-    // Storage full or refused; the book still opened.
-  }
-}
-
-async function recallMeasurement(id: string): Promise<LayoutMeasurement | undefined> {
-  try {
-    const row = await get<LayoutMeasurement & { id: string }>(STORE_LAYOUT, id)
-    return row ? { pageCount: row.pageCount, viewportCoverage: row.viewportCoverage, viewports: row.viewports } : undefined
-  } catch {
-    return undefined
-  }
 }
 
 export async function importBook(
